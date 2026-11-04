@@ -37,9 +37,7 @@ export default function EditEpisode() {
         video_url: episode.video_url,
         orden: episode.orden,
       }}
-      onSuccess={() => {
-        router.push("/admin/animes")
-      }}
+      onSuccess={() => router.push("/admin/animes")}
     />
   )
 }

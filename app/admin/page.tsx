@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase"
 
+export const dynamic = "force-dynamic"
+
 export default async function AdminDashboard() {
   const supabase = createClient()
 

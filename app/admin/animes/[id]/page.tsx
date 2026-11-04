@@ -40,9 +40,7 @@ export default function EditAnime() {
         anio: anime.anio,
         estado: anime.estado,
       }}
-      onSuccess={() => {
-        router.push("/admin/animes")
-      }}
+      onSuccess={() => router.push("/admin/animes")}
     />
   )
 }

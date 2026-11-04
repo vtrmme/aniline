@@ -16,8 +16,7 @@
     "next-auth": "^4.24.15",
     "plyr": "^3.8.5",
     "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "react-plyr": "^2.2.0"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

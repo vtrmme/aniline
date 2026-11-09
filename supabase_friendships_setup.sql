@@ -31,7 +31,7 @@ CREATE POLICY "Users can create friendship requests" ON friendships
   FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Users can update friendship status" ON friendships
-  FOR UPDATE WITH CHECK (true);
+  FOR UPDATE USING (true) WITH CHECK (true);
 
 CREATE POLICY "Users can delete their own friendships" ON friendships
-  FOR DELETE WITH CHECK (true);
+  FOR DELETE USING (true);

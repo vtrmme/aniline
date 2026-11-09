@@ -55,13 +55,31 @@ export async function POST(req: Request) {
     }
 
     if (existing) {
+      const insertData: { estado: string; puntuacion?: number } = { estado }
+      if (puntuacion !== undefined && puntuacion !== null) {
+        insertData.puntuacion = puntuacion
+      }
+
       const { error } = await supabase
         .from("watchlists")
-        .update({ estado, puntuacion })
+        .update(insertData)
         .eq("id", existing.id)
 
       if (error) {
         console.error("Watchlist POST update error:", error)
+        if (error.message.includes("puntuacion")) {
+          const { error: retryError } = await supabase
+            .from("watchlists")
+            .update({ estado })
+            .eq("id", existing.id)
+          if (retryError) {
+            return NextResponse.json(
+              { ok: false, error: retryError.message },
+              { status: 500 }
+            )
+          }
+          return NextResponse.json({ ok: true, action: "updated", estado })
+        }
         return NextResponse.json(
           { ok: false, error: error.message },
           { status: 500 }
@@ -71,17 +89,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, action: "updated", estado, puntuacion })
     }
 
+    const insertPayload: {
+      user_id: string
+      anime_id: string
+      estado: string
+      puntuacion?: number
+    } = { user_id, anime_id, estado }
+    if (puntuacion !== undefined && puntuacion !== null) {
+      insertPayload.puntuacion = puntuacion
+    }
+
     const { error } = await supabase
       .from("watchlists")
-      .insert({
-        user_id,
-        anime_id,
-        estado,
-        puntuacion,
-      })
+      .insert(insertPayload)
 
     if (error) {
       console.error("Watchlist POST insert error:", error)
+      if (error.message.includes("puntuacion")) {
+        const { error: retryError } = await supabase
+          .from("watchlists")
+          .insert({ user_id, anime_id, estado })
+        if (retryError) {
+          return NextResponse.json(
+            { ok: false, error: retryError.message },
+            { status: 500 }
+          )
+        }
+        return NextResponse.json({ ok: true, action: "created", estado })
+      }
       return NextResponse.json(
         { ok: false, error: error.message },
         { status: 500 }

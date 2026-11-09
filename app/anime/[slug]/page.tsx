@@ -30,6 +30,7 @@ export default function AnimeDetail({
   const [watchlistItem, setWatchlistItem] = useState<{ estado: string; puntuacion?: number } | null>(null)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
   const [puntuacion, setPuntuacionState] = useState<number | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [similares, setSimilares] = useState<Anime[]>([])
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function AnimeDetail({
   const toggleWatchlist = async (estado: string) => {
     if (!userId || !animeId) return
     setWatchlistLoading(true)
+    setErrorMsg(null)
 
     const current = watchlistItem?.estado === estado
     if (current && watchlistItem) {
@@ -107,6 +109,9 @@ export default function AnimeDetail({
       if (res.ok) {
         setWatchlistItem(null)
         setPuntuacionState(null)
+      } else {
+        const json = await res.json().catch(() => ({}))
+        setErrorMsg(json.error || "Error al quitar de la lista")
       }
     } else {
       const res = await fetch("/api/watchlist", {
@@ -118,6 +123,9 @@ export default function AnimeDetail({
         const json = await res.json()
         setWatchlistItem({ estado: json.estado, puntuacion: json.puntuacion })
         setPuntuacionState(json.puntuacion || null)
+      } else {
+        const json = await res.json().catch(() => ({}))
+        setErrorMsg(json.error || "Error al agregar a la lista")
       }
     }
     setWatchlistLoading(false)
@@ -134,6 +142,9 @@ export default function AnimeDetail({
       const json = await res.json()
       setWatchlistItem({ estado: json.estado, puntuacion: json.puntuacion })
       setPuntuacionState(json.puntuacion || null)
+    } else {
+      const json = await res.json().catch(() => ({}))
+      setErrorMsg(json.error || "Error al guardar puntuación")
     }
   }
 

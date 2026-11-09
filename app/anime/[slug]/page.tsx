@@ -117,12 +117,11 @@ export default function AnimeDetail({
       const res = await fetch("/api/watchlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anime_id: animeId, estado, puntuacion }),
+        body: JSON.stringify({ anime_id: animeId, estado }),
       })
       if (res.ok) {
         const json = await res.json()
-        setWatchlistItem({ estado: json.estado, puntuacion: json.puntuacion })
-        setPuntuacionState(json.puntuacion || null)
+        setWatchlistItem({ estado: json.estado, puntuacion: watchlistItem?.puntuacion ?? undefined })
       } else {
         const json = await res.json().catch(() => ({}))
         setErrorMsg(json.error || "Error al agregar a la lista")
@@ -133,16 +132,13 @@ export default function AnimeDetail({
 
   const setPuntuacion = async (valor: number) => {
     if (!userId || !animeId) return
+    setPuntuacionState(valor)
     const res = await fetch("/api/watchlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ anime_id: animeId, estado: watchlistItem?.estado || "para_ver", puntuacion: valor }),
     })
-    if (res.ok) {
-      const json = await res.json()
-      setWatchlistItem({ estado: json.estado, puntuacion: json.puntuacion })
-      setPuntuacionState(json.puntuacion || null)
-    } else {
+    if (!res.ok) {
       const json = await res.json().catch(() => ({}))
       setErrorMsg(json.error || "Error al guardar puntuación")
     }

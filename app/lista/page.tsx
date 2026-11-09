@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import type { Anime } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -19,25 +20,53 @@ interface WatchlistItem {
   animes: Anime
 }
 
-export default function Lista() {
+interface FriendWatchlistItem {
+  anime_id: string
+  estado: string
+  puntuacion?: number
+  created_at: string
+  anime: Anime
+}
+
+function ListaContent() {
   const { lang } = useLanguage()
+  const searchParams = useSearchParams()
+  const viewingFriendId = searchParams.get("user_id")
+  const viewingFriendEmail = searchParams.get("email")
+  const isOwnList = !viewingFriendId
+
   const [items, setItems] = useState<{ anime: Anime; estado: string; puntuacion?: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const cargar = async () => {
+      setLoading(true)
       try {
-        const res = await fetch("/api/watchlist/mine")
-        if (res.ok) {
-          const json = await res.json()
-          setItems(
-            (json.items || []).map((d: WatchlistItem) => ({
-              anime: d.animes as Anime,
-              estado: d.estado,
-              puntuacion: d.puntuacion,
-            }))
-          )
+        if (viewingFriendId) {
+          const res = await fetch(`/api/users/${viewingFriendId}/watchlist`)
+          if (res.ok) {
+            const json = await res.json()
+            setItems(
+              (json.items || []).map((d: FriendWatchlistItem) => ({
+                anime: d.anime as Anime,
+                estado: d.estado,
+                puntuacion: d.puntuacion,
+              }))
+            )
+          }
+        } else {
+          const res = await fetch("/api/watchlist/mine")
+          if (res.ok) {
+            const json = await res.json()
+            setItems(
+              (json.items || []).map((d: WatchlistItem) => ({
+                anime: d.animes as Anime,
+                estado: d.estado,
+                puntuacion: d.puntuacion,
+              }))
+            )
+          }
         }
       } catch {
         // ignore
@@ -46,7 +75,7 @@ export default function Lista() {
       }
     }
     cargar()
-  }, [lang])
+  }, [lang, viewingFriendId])
 
   const estadoLabel = (estado: string) => {
     if (lang === "es") return estado
@@ -108,38 +137,67 @@ export default function Lista() {
     )
   }
 
+  const pageTitle = viewingFriendId
+    ? `${t(lang, "myListTitle")} de ${viewingFriendEmail}`
+    : t(lang, "myListTitle")
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">{t(lang, "myListTitle")}</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-white">{pageTitle}</h1>
+          {viewingFriendId && (
+            <p className="text-sm text-gray-400">
+              {lang === "es" ? "Lista de tu amigo" : "Friend's list"}
+            </p>
+          )}
+        </div>
         <div className="flex gap-2">
-          {["todos", "visto", "viendo", "para_ver"].map((filtro) => (
-            <button
-              key={filtro}
-              onClick={() => {
-                // Filtro simple en cliente (se podría mejorar con estado)
-              }}
-              className={cn(
-                "px-3 py-1 text-xs rounded-full transition",
-                filtro === "todos"
-                  ? "bg-red-600 text-white"
-                  : "bg-gray-800 text-gray-400 hover:text-white"
-              )}
+          {isOwnList && (
+            <>
+              {["todos", "visto", "viendo", "para_ver"].map((filtro) => (
+                <button
+                  key={filtro}
+                  onClick={() => {
+                    // Filtro simple en cliente (se podría mejorar con estado)
+                  }}
+                  className={cn(
+                    "px-3 py-1 text-xs rounded-full transition",
+                    filtro === "todos"
+                      ? "bg-red-600 text-white"
+                      : "bg-gray-800 text-gray-400 hover:text-white"
+                  )}
+                >
+                  {filtro === "todos"
+                    ? t(lang, "myListFilterTodos")
+                    : filtro === "visto"
+                      ? t(lang, "myListFilterVisto")
+                      : filtro === "viendo"
+                        ? t(lang, "myListFilterViendo")
+                        : t(lang, "myListFilterParaVer")}
+                </button>
+              ))}
+            </>
+          )}
+          {viewingFriendId && (
+            <Link
+              href="/lista"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
             >
-              {filtro === "todos"
-                ? t(lang, "myListFilterTodos")
-                : filtro === "visto"
-                  ? t(lang, "myListFilterVisto")
-                  : filtro === "viendo"
-                    ? t(lang, "myListFilterViendo")
-                    : t(lang, "myListFilterParaVer")}
-            </button>
-          ))}
+              ← {t(lang, "myListTitle")}
+            </Link>
+          )}
         </div>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-gray-400 text-center py-20">{t(lang, "myListEmpty")}</p>
+        <p className="text-gray-400 text-center py-20">
+          {viewingFriendId
+            ? lang === "es"
+              ? "Tu amigo no tiene animes en su lista aún."
+              : "Your friend has no anime in their list yet."
+            : t(lang, "myListEmpty")}
+        </p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
           {items.map(({ anime, estado, puntuacion }) => {
@@ -165,32 +223,47 @@ export default function Lista() {
                   )}
                 </div>
                 <h3 className="text-sm font-medium text-white truncate">{title}</h3>
-                <div className="flex gap-1">
-                  {["para_ver", "viendo", "visto"].map((e) => (
-                    <button
-                      key={e}
-                      onClick={() => cambiarEstado(anime.id, e)}
-                      disabled={saving.has(anime.id)}
-                      className={cn(
-                        "flex-1 py-1 text-xs rounded transition",
-                        estado === e
-                          ? estadoColor(e)
-                          : "bg-gray-800 text-gray-500 hover:text-white"
-                      )}
-                    >
-                      {e === "para_ver"
-                        ? t(lang, "statusPlanToWatch").charAt(0)
-                        : e === "viendo"
-                          ? t(lang, "statusWatching").charAt(0)
-                          : t(lang, "statusCompleted").charAt(0)}
-                    </button>
-                  ))}
-                </div>
+                {isOwnList && (
+                  <div className="flex gap-1">
+                    {["para_ver", "viendo", "visto"].map((e) => (
+                      <button
+                        key={e}
+                        onClick={() => cambiarEstado(anime.id, e)}
+                        disabled={saving.has(anime.id)}
+                        className={cn(
+                          "flex-1 py-1 text-xs rounded transition",
+                          estado === e
+                            ? estadoColor(e)
+                            : "bg-gray-800 text-gray-500 hover:text-white"
+                        )}
+                      >
+                        {e === "para_ver"
+                          ? t(lang, "statusPlanToWatch").charAt(0)
+                          : e === "viendo"
+                            ? t(lang, "statusWatching").charAt(0)
+                            : t(lang, "statusCompleted").charAt(0)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </Link>
             )
           })}
         </div>
       )}
     </div>
+  )
+}
+
+export default function Lista() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-400">
+        <div className="animate-pulse rounded-full h-10 w-10 bg-gray-800 mx-auto mb-3"></div>
+        Cargando lista...
+      </div>
+    }>
+      <ListaContent />
+    </Suspense>
   )
 }

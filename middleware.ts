@@ -11,7 +11,9 @@ export default withAuth({
         return !isAuth
       }
 
-      const protectedRoutes = ["/lista", "/perfil", "/anime"]
+      // Solo /lista y /perfil requieren autenticación
+      // /anime es público (detalle de anime, episodios, etc.)
+      const protectedRoutes = ["/lista", "/perfil"]
       const isProtected = protectedRoutes.some((r) => pathname.startsWith(r))
       return isProtected ? isAuth : true
     },
@@ -19,5 +21,5 @@ export default withAuth({
 })
 
 export const config = {
-  matcher: ["/lista/:path*", "/perfil/:path*", "/anime/:path*", "/auth/:path*"],
+  matcher: ["/lista/:path*", "/perfil/:path*", "/auth/:path*"],
 }

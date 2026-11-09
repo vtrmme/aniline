@@ -11,6 +11,7 @@ interface AdminUser {
 
 interface WatchlistRow {
   id: string
+  user_id: string
   anime_id: string
   estado: string
   puntuacion?: number
@@ -18,40 +19,40 @@ interface WatchlistRow {
   animes: Anime
 }
 
-async function getUserId(req: NextRequest): Promise<string | null> {
+async function getUserEmail(req: NextRequest): Promise<string | null> {
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
   })
-  return token?.sub || null
+  return token?.email ?? null
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ user_id: string }> }) {
   try {
-    const viewer_id = await getUserId(req)
-    if (!viewer_id) {
+    const viewer_email = await getUserEmail(req)
+    if (!viewer_email) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
         { status: 401 }
       )
     }
 
-    const { user_id: target_user_id } = await params
+    const { user_id: target_email } = await params
 
-    if (!target_user_id) {
+    if (!target_email) {
       return NextResponse.json(
-        { ok: false, error: "ID de usuario requerido" },
+        { ok: false, error: "Email de usuario requerido" },
         { status: 400 }
       )
     }
 
     const supabase = createServerClient()
 
-    // Verificar que son amigos (amistad aceptada en cualquier dirección)
+    // Verificar que son amigos (amistad aceptada en cualquier dirección por email)
     const { data: friendship, error: friendshipError } = await supabase
       .from("friendships")
       .select("*")
-      .or(`and(user_id.eq.${viewer_id},friend_id.eq.${target_user_id}),and(user_id.eq.${target_user_id},friend_id.eq.${viewer_id})`)
+      .or(`and(user_email.eq.${viewer_email},friend_email.eq.${target_email}),and(user_email.eq.${target_email},friend_email.eq.${viewer_email})`)
       .eq("status", "accepted")
       .single()
 
@@ -62,21 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       )
     }
 
-    // Obtener el watchlist del usuario objetivo
-    const { data: watchlists, error } = await supabase
-      .from("watchlists")
-      .select("*, animes(*)")
-      .eq("user_id", target_user_id)
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500 }
-      )
-    }
-
-    // Obtener email del usuario objetivo para mostrarlo
+    // Buscar el UUID de Supabase Auth del usuario objetivo por email
     const { data: listUsers, error: userError } = await supabase.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
@@ -89,12 +76,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     }
 
     const users = listUsers?.users || []
-    const targetUser = users.find((u: AdminUser) => u.id === target_user_id)
-    const targetEmail = targetUser?.email || "Desconocido"
+    const targetUser = users.find((u: AdminUser) => u.email?.toLowerCase() === target_email.toLowerCase())
+    if (!targetUser) {
+      return NextResponse.json(
+        { ok: false, error: "Usuario no encontrado en Supabase Auth" },
+        { status: 404 }
+      )
+    }
+
+    const target_supabase_user_id = targetUser.id
+
+    // Obtener el watchlist del usuario objetivo (por su UUID de Supabase Auth)
+    const { data: watchlists, error } = await supabase
+      .from("watchlists")
+      .select("*, animes(*)")
+      .eq("user_id", target_supabase_user_id)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       ok: true,
-      user_email: targetEmail,
+      user_email: target_email,
       items: (watchlists || []).map((w: WatchlistRow) => ({
         id: w.id,
         anime_id: w.anime_id,

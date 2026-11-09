@@ -3,18 +3,12 @@ import { NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import { NextRequest } from "next/server"
 
-interface ProfileWithEmail {
-  email?: string | null
-}
-
 interface FriendshipRow {
   id: string
-  user_id: string
-  friend_id: string
+  user_email: string
+  friend_email: string
   status: string
   created_at: string
-  user_profiles: ProfileWithEmail[]
-  friend_profiles: ProfileWithEmail[]
 }
 
 interface AdminUser {
@@ -22,18 +16,18 @@ interface AdminUser {
   email?: string | null
 }
 
-async function getUserId(req: NextRequest): Promise<string | null> {
+async function getUserEmail(req: NextRequest): Promise<string | null> {
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
   })
-  return token?.sub || null
+  return token?.email ?? null
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const user_id = await getUserId(req)
-    if (!user_id) {
+    const user_email = await getUserEmail(req)
+    if (!user_email) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
         { status: 401 }
@@ -44,8 +38,8 @@ export async function GET(req: NextRequest) {
 
     const { data: friendships, error } = await supabase
       .from("friendships")
-      .select("*, user_profiles!left(email), friend_profiles!right(email)")
-      .or(`user_id.eq.${user_id},friend_id.eq.${user_id}`)
+      .select("*")
+      .or(`user_email.eq.${user_email},friend_email.eq.${user_email}`)
       .eq("status", "accepted")
 
     if (error) {
@@ -57,8 +51,8 @@ export async function GET(req: NextRequest) {
 
     const { data: pendingReceived, error: pendingReceivedError } = await supabase
       .from("friendships")
-      .select("*, user_profiles!left(email)")
-      .eq("friend_id", user_id)
+      .select("*")
+      .eq("friend_email", user_email)
       .eq("status", "pending")
 
     if (pendingReceivedError) {
@@ -70,8 +64,8 @@ export async function GET(req: NextRequest) {
 
     const { data: pendingSent, error: pendingSentError } = await supabase
       .from("friendships")
-      .select("*, friend_profiles!right(email)")
-      .eq("user_id", user_id)
+      .select("*")
+      .eq("user_email", user_email)
       .eq("status", "pending")
 
     if (pendingSentError) {
@@ -82,12 +76,10 @@ export async function GET(req: NextRequest) {
     }
 
     const friends = (friendships || []).map((f: FriendshipRow) => {
-      const isUserRequester = f.user_id === user_id
-      const friendData = isUserRequester ? f.friend_profiles : f.user_profiles
+      const isUserRequester = f.user_email === user_email
       return {
         id: f.id,
-        friend_id: isUserRequester ? f.friend_id : f.user_id,
-        email: friendData?.[0]?.email || "Desconocido",
+        friend_email: isUserRequester ? f.friend_email : f.user_email,
         status: f.status,
         created_at: f.created_at,
       }
@@ -95,16 +87,14 @@ export async function GET(req: NextRequest) {
 
     const pendingIncoming = (pendingReceived || []).map((f: FriendshipRow) => ({
       id: f.id,
-      from_user_id: f.user_id,
-      from_email: f.user_profiles?.[0]?.email || "Desconocido",
+      from_email: f.user_email,
       status: f.status,
       created_at: f.created_at,
     }))
 
     const pendingOutgoing = (pendingSent || []).map((f: FriendshipRow) => ({
       id: f.id,
-      to_user_id: f.friend_id,
-      to_email: f.friend_profiles?.[0]?.email || "Desconocido",
+      to_email: f.friend_email,
       status: f.status,
       created_at: f.created_at,
     }))
@@ -130,9 +120,9 @@ export async function POST(req: Request) {
       req: nextReq,
       secret: process.env.NEXTAUTH_SECRET,
     })
-    const user_id = token?.sub || null
+    const user_email = token?.email ?? null
 
-    if (!user_id) {
+    if (!user_email) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
         { status: 401 }
@@ -148,8 +138,19 @@ export async function POST(req: Request) {
       )
     }
 
+    const normalizedFriendEmail = friend_email.toLowerCase()
+    const normalizedUserEmail = user_email.toLowerCase()
+
+    if (normalizedFriendEmail === normalizedUserEmail) {
+      return NextResponse.json(
+        { ok: false, error: "No puedes agregarte a ti mismo" },
+        { status: 400 }
+      )
+    }
+
     const supabase = createServerClient()
 
+    // Verificar que el amigo existe en Supabase Auth
     const { data: listUsers, error: userError } = await supabase.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
@@ -162,7 +163,7 @@ export async function POST(req: Request) {
     }
 
     const users = listUsers?.users || []
-    const targetUser = users.find((u: AdminUser) => u.email?.toLowerCase() === friend_email.toLowerCase())
+    const targetUser = users.find((u: AdminUser) => u.email?.toLowerCase() === normalizedFriendEmail)
     if (!targetUser) {
       return NextResponse.json(
         { ok: false, error: "Usuario no encontrado" },
@@ -170,19 +171,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const friend_id = targetUser.id
-
-    if (friend_id === user_id) {
-      return NextResponse.json(
-        { ok: false, error: "No puedes agregarte a ti mismo" },
-        { status: 400 }
-      )
-    }
-
+    // Verificar si ya existe una amistad entre estos emails
     const { data: existing } = await supabase
       .from("friendships")
       .select("*")
-      .or(`and(user_id.eq.${user_id},friend_id.eq.${friend_id}),and(user_id.eq.${friend_id},friend_id.eq.${user_id})`)
+      .or(`and(user_email.eq.${user_email},friend_email.eq.${friend_email}),and(user_email.eq.${friend_email},friend_email.eq.${user_email})`)
       .single()
 
     if (existing) {
@@ -195,8 +188,8 @@ export async function POST(req: Request) {
     const { error } = await supabase
       .from("friendships")
       .insert({
-        user_id,
-        friend_id,
+        user_email,
+        friend_email,
         status: "pending",
       })
 

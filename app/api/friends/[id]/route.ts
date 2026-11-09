@@ -12,9 +12,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       req: nextReq,
       secret: process.env.NEXTAUTH_SECRET,
     })
-    const user_id = token?.sub || null
+    const user_email = token?.email ?? null
 
-    if (!user_id) {
+    if (!user_email) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
         { status: 401 }
@@ -34,12 +34,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const supabase = createServerClient()
 
-    // Verificar que la solicitud existe y que el usuario es el destinatario
+    // Verificar que la solicitud existe, está pendiente y el usuario es el destinatario
     const { data: friendship, error: selectError } = await supabase
       .from("friendships")
       .select("*")
       .eq("id", friendshipId)
-      .eq("friend_id", user_id)
+      .eq("friend_email", user_email)
       .eq("status", "pending")
       .single()
 

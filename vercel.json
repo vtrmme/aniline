@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "framework": "nextjs",
+  "routes": [
+    { "src": "/api/friends(.*)", "dest": "/api/friends" },
+    { "src": "/api/friends/(.*)", "dest": "/api/friends/[id]" },
+    { "src": "/api/users/(.*)/watchlist", "dest": "/api/users/[user_id]/watchlist" },
+    { "src": "/api/watchlist(.*)", "dest": "/api/watchlist" },
+    { "src": "/api/watchlist/mine", "dest": "/api/watchlist/mine" },
+    { "src": "/api/historial(.*)", "dest": "/api/historial" },
+    { "src": "/api/perfil/stats", "dest": "/api/perfil/stats" },
+    { "src": "/api/videos/upload", "dest": "/api/videos/upload" },
+    { "src": "/api/videos/play", "dest": "/api/videos/play" },
+    { "src": "/api/animes/sync", "dest": "/api/animes/sync" },
+    { "src": "/api/auth/(.*)", "dest": "/api/auth/[...nextauth]" },
+    { "src": "/sitemap.xml", "dest": "/sitemap.xml" },
+    { "src": "/robots.txt", "dest": "/robots.txt" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}

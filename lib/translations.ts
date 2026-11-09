@@ -27,6 +27,7 @@ export const translations = {
     statusWatching: "viendo",
     statusPlanToWatch: "para ver",
     statusCompleted: "visto",
+    episodeNotAvailable: "Video no disponible aún",
   },
   en: {
     siteName: "AniLine",
@@ -54,6 +55,7 @@ export const translations = {
     statusWatching: "watching",
     statusPlanToWatch: "plan to watch",
     statusCompleted: "completed",
+    episodeNotAvailable: "Video not available yet",
   },
 } as const
 

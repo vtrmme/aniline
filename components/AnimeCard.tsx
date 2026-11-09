@@ -3,7 +3,6 @@
 import Link from "next/link"
 import Image from "next/image"
 import type { Anime } from "@/types"
-import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
 
 interface AnimeCardProps {
@@ -20,7 +19,7 @@ export function AnimeCard({ anime, lang: propLang }: AnimeCardProps) {
     <Link href={`/anime/${anime.slug}`} className="group block">
       <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800">
         <Image
-          src={anime.poster_url || "https://via.placeholder.com/300x450?text=Anime"}
+          src={anime.poster_url && anime.poster_url.startsWith("http") ? anime.poster_url : "/placeholder-anime.svg"}
           alt={title}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

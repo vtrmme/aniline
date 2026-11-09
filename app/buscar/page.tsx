@@ -1,9 +1,10 @@
 "use client"
 
 import { createClient } from "@/lib/supabase"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Search } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import type { Anime } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
@@ -14,7 +15,7 @@ export default function Buscar() {
   const [results, setResults] = useState<Anime[]>([])
   const [loading, setLoading] = useState(false)
 
-  const buscar = async () => {
+  const buscar = useCallback(async () => {
     if (!query.trim()) {
       setResults([])
       return
@@ -28,12 +29,12 @@ export default function Buscar() {
       .limit(20)
     setResults((data || []) as Anime[])
     setLoading(false)
-  }
+  }, [query])
 
   useEffect(() => {
     const timer = setTimeout(buscar, 300)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [buscar])
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -60,10 +61,13 @@ export default function Buscar() {
           return (
             <Link key={anime.id} href={`/anime/${anime.slug}`} className="block">
               <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 mb-2">
-                <img
-                  src={anime.poster_url || "https://via.placeholder.com/300x450"}
+                <Image
+                  src={anime.poster_url && anime.poster_url.startsWith("http") ? anime.poster_url : "/placeholder-anime.svg"}
                   alt={title}
                   className="w-full h-full object-cover"
+                  width={300}
+                  height={450}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
               </div>
               <h3 className="text-sm font-medium text-white truncate">

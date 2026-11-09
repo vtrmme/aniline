@@ -1,11 +1,20 @@
 "use client"
 
-import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import type { Anime } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
+
+interface WatchlistItem {
+  id: string
+  user_id: string
+  anime_id: string
+  estado: string
+  created_at: string
+  animes: Anime
+}
 
 export default function Lista() {
   const { lang } = useLanguage()
@@ -14,25 +23,22 @@ export default function Lista() {
 
   useEffect(() => {
     const cargar = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      try {
+        const res = await fetch("/api/watchlist/mine")
+        if (res.ok) {
+          const json = await res.json()
+          setItems(
+            (json.items || []).map((d: WatchlistItem) => ({
+              anime: d.animes as Anime,
+              estado: d.estado,
+            }))
+          )
+        }
+      } catch {
+        // ignore
+      } finally {
         setLoading(false)
-        return
       }
-
-      const { data } = await supabase
-        .from("watchlists")
-        .select("*, animes(*)")
-        .eq("user_id", user.id)
-
-      setItems(
-        (data || []).map((d: any) => ({
-          anime: d.animes as Anime,
-          estado: d.estado,
-        }))
-      )
-      setLoading(false)
     }
     cargar()
   }, [lang])
@@ -69,10 +75,13 @@ export default function Lista() {
             return (
               <Link key={anime.id} href={`/anime/${anime.slug}`} className="block">
                 <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 mb-2">
-                  <img
-                    src={anime.poster_url || "https://via.placeholder.com/300x450"}
+                  <Image
+                    src={anime.poster_url && anime.poster_url.startsWith("http") ? anime.poster_url : "/placeholder-anime.svg"}
                     alt={title}
                     className="w-full h-full object-cover"
+                    width={300}
+                    height={450}
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                   <span className="absolute top-2 right-2 text-xs font-bold text-white bg-red-600 px-2 py-1 rounded">
                     {estadoLabel(estado)}

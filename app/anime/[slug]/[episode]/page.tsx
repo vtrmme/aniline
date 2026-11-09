@@ -1,7 +1,6 @@
 "use client"
 
 import { createClient } from "@/lib/supabase"
-import { notFound, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { VideoPlayer } from "@/components/VideoPlayer"
 import Link from "next/link"
@@ -15,42 +14,85 @@ export default function EpisodePage({
   params: Promise<{ slug: string; episode: string }>
 }) {
   const { lang } = useLanguage()
-  const router = useRouter()
   const [anime, setAnime] = useState<Anime | null>(null)
   const [episodeData, setEpisodeData] = useState<Episode | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [slug, setSlug] = useState<string | null>(null)
+  const [num, setNum] = useState<number | null>(null)
+
   useEffect(() => {
+    let cancelled = false
+    params.then(({ slug: s, episode: e }) => {
+      if (cancelled) return
+      setSlug(s)
+      setNum(Number(e))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [lang])
+
+  useEffect(() => {
+    if (!slug || num === null) return
     const fetchData = async () => {
-      const { slug, episode } = await params
-      const num = Number(episode)
-      const supabase = createClient()
+      try {
+        const supabase = createClient()
 
-      const { data: animeData } = await supabase
-        .from("animes")
-        .select("*")
-        .eq("slug", slug)
-        .single()
+        const { data: animeData } = await supabase
+          .from("animes")
+          .select("*")
+          .eq("slug", slug)
+          .single()
 
-      const { data: epData } = await supabase
-        .from("episodes")
-        .select("*")
-        .eq("anime_id", animeData?.id)
-        .eq("numero", num)
-        .single()
+        if (!animeData || !animeData.id) {
+          setLoading(false)
+          return
+        }
 
-      if (!animeData || !epData) {
-        router.push("/404")
-        return
+        const { data: epData } = await supabase
+          .from("episodes")
+          .select("*")
+          .eq("anime_id", animeData.id)
+          .eq("numero", num)
+          .single()
+
+        if (!animeData || !epData) {
+          setLoading(false)
+          return
+        }
+
+        setAnime(animeData as Anime)
+        setEpisodeData(epData as Episode)
+
+        if (epData.youtube_url) {
+          setVideoUrl(null)
+          setYoutubeUrl(epData.youtube_url)
+        } else if (epData.video_url) {
+          const res = await fetch(`/api/videos/play?path=${encodeURIComponent(epData.video_url)}`)
+          if (res.ok) {
+            const json = await res.json()
+            setVideoUrl(json.videoUrl || null)
+            setYoutubeUrl(null)
+          } else {
+            setVideoUrl(null)
+            setYoutubeUrl(null)
+          }
+        } else {
+          setVideoUrl(null)
+          setYoutubeUrl(null)
+        }
+      } catch (err) {
+        console.error("Error cargando episodio:", err)
+      } finally {
+        setLoading(false)
       }
-
-      setAnime(animeData as Anime)
-      setEpisodeData(epData as Episode)
-      setLoading(false)
     }
 
     fetchData()
-  }, [params, router, lang])
+  }, [slug, num, lang])
 
   if (loading) {
     return (
@@ -63,7 +105,13 @@ export default function EpisodePage({
   }
 
   if (!anime || !episodeData) {
-    notFound()
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="flex flex-col items-center justify-center text-gray-400">
+          <p className="text-gray-400 text-center p-8">Episodio no encontrado</p>
+        </div>
+      </div>
+    )
   }
 
   const title = lang === "es" ? anime.title_es : anime.title_en || anime.title_es
@@ -84,7 +132,15 @@ export default function EpisodePage({
         <span className="text-white">{t(lang, "episodeWatch")} {episodeData.numero}</span>
       </nav>
 
-      <VideoPlayer videoUrl={episodeData.video_url} />
+      {!videoUrl && !youtubeUrl ? (
+        <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl aspect-video w-full flex items-center justify-center">
+          <p className="text-gray-400 text-center p-8">
+            {t(lang, "episodeNotAvailable") || "Video no disponible aún"}
+          </p>
+        </div>
+      ) : (
+        <VideoPlayer videoUrl={videoUrl} youtubeUrl={youtubeUrl} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
         <div className="lg:col-span-8">

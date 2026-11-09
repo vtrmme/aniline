@@ -2,12 +2,14 @@
 
 import { createClient } from "@/lib/supabase"
 import { notFound, useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import type { Anime, Episode } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
+import { cn } from "@/lib/utils"
 
 interface AnimeWithEpisodes extends Anime {
   episodes?: Episode[]
@@ -19,24 +21,38 @@ export default function AnimeDetail({
   params: Promise<{ slug: string }>
 }) {
   const { lang } = useLanguage()
+  const { data: session } = useSession()
   const router = useRouter()
+  const userId = (session?.user as { id?: string })?.id
   const [anime, setAnime] = useState<AnimeWithEpisodes | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [watchlistItem, setWatchlistItem] = useState<{ estado: string } | null>(null)
+  const [watchlistLoading, setWatchlistLoading] = useState(false)
 
   useEffect(() => {
-    const fetchAnime = async () => {
-      const { slug: s } = await params
+    let cancelled = false
+    params.then(({ slug: s }) => {
+      if (cancelled) return
       setSlug(s)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [lang])
+
+  useEffect(() => {
+    if (!slug) return
+    const fetchAnime = async () => {
       const supabase = createClient()
       const { data } = await supabase
         .from("animes")
         .select("*, episodes(*)")
-        .eq("slug", s)
+        .eq("slug", slug)
         .single()
 
       if (!data) {
-        router.push("/404")
+        notFound()
         return
       }
 
@@ -45,9 +61,61 @@ export default function AnimeDetail({
     }
 
     fetchAnime()
-  }, [params, router, lang])
+  }, [slug, lang])
 
-  if (loading || !slug) {
+  const animeId = anime?.id
+
+  useEffect(() => {
+    if (!animeId || !userId) return
+    const checkWatchlist = async () => {
+      try {
+        const res = await fetch(`/api/watchlist?anime_id=${animeId}`)
+        if (res.ok) {
+          const json = await res.json()
+          setWatchlistItem(json.inList ? { estado: json.estado } : null)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    checkWatchlist()
+  }, [animeId, userId])
+
+  const toggleWatchlist = async (estado: string) => {
+    if (!userId || !animeId) return
+    setWatchlistLoading(true)
+
+    const current = watchlistItem?.estado === estado
+    if (current && watchlistItem) {
+      // Quitar de la lista
+      const res = await fetch(`/api/watchlist?anime_id=${animeId}`, {
+        method: "DELETE",
+      })
+      if (res.ok) {
+        setWatchlistItem(null)
+      }
+    } else {
+      // Agregar o actualizar
+      const res = await fetch("/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anime_id: animeId, estado }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setWatchlistItem({ estado: json.estado })
+      }
+    }
+    setWatchlistLoading(false)
+  }
+
+  const estadoOptions: { value: string; label: string }[] = [
+    { value: "para_ver", label: t(lang, "statusPlanToWatch") },
+    { value: "viendo", label: t(lang, "statusWatching") },
+    { value: "visto", label: t(lang, "statusCompleted") },
+  ]
+
+  if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="flex flex-col items-center justify-center text-gray-400">
@@ -71,16 +139,59 @@ export default function AnimeDetail({
         <div className="lg:col-span-4">
           <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 mb-4">
             <Image
-              src={anime.poster_url || "https://via.placeholder.com/300x450"}
+              src={anime.poster_url && anime.poster_url.startsWith("http") ? anime.poster_url : "/placeholder-anime.svg"}
               alt={title}
               fill
               className="object-cover"
               priority
             />
           </div>
-          <Link href="/lista" className="block w-full py-3 px-4 text-center text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition">
-            {t(lang, "animeDetailAddList")}
-          </Link>
+          {session ? (
+            <div className="space-y-2">
+              <button
+                onClick={() => toggleWatchlist(watchlistItem?.estado || "para_ver")}
+                disabled={watchlistLoading}
+                className={cn(
+                  "block w-full py-3 px-4 text-center text-white rounded-lg font-medium transition",
+                  watchlistItem
+                    ? "bg-gray-700 hover:bg-gray-600"
+                    : "bg-red-600 hover:bg-red-700"
+                )}
+              >
+                {watchlistLoading
+                  ? "Procesando..."
+                  : watchlistItem
+                    ? `Quitar de mi lista (${watchlistItem.estado})`
+                    : t(lang, "animeDetailAddList")}
+              </button>
+              {watchlistItem && (
+                <div className="flex gap-2">
+                  {estadoOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => toggleWatchlist(opt.value)}
+                      disabled={watchlistLoading}
+                      className={cn(
+                        "flex-1 py-2 text-sm text-white rounded transition",
+                        watchlistItem.estado === opt.value
+                          ? "bg-red-600"
+                          : "bg-gray-700 hover:bg-gray-600"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => router.push("/auth/signin")}
+              className="block w-full py-3 px-4 text-center text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition"
+            >
+              {t(lang, "animeDetailAddList")}
+            </button>
+          )}
         </div>
         <div className="lg:col-span-8">
           <h1 className="text-3xl font-bold text-white mb-2">{title}</h1>

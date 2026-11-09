@@ -1,18 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useSession, signIn, signOut } from "next-auth/react"
-import { Menu, X, LogIn, LogOut, Search } from "lucide-react"
+import { Menu, X, LogIn, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
-import type { Lang } from "@/lib/translations"
 import React from "react"
 
 export function Navbar() {
   const { data: session } = useSession()
-  const router = useRouter()
   const pathname = usePathname()
   const [open, setOpen] = React.useState(false)
   const { lang, setLang } = useLanguage()

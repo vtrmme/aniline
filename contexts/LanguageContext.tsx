@@ -11,22 +11,29 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("es")
-
-  useEffect(() => {
-    const saved = localStorage.getItem("aniline-lang") as Lang | null
-    if (saved === "es" || saved === "en") {
-      setLangState(saved)
+  const [lang, setLangState] = useState<Lang>(() => {
+    try {
+      const saved = localStorage.getItem("aniline-lang")
+      if (saved === "es" || saved === "en") {
+        return saved
+      }
+    } catch {
+      // ignore
     }
-  }, [])
+    return "es"
+  })
 
   useEffect(() => {
-    localStorage.setItem("aniline-lang", lang)
     document.documentElement.lang = lang
   }, [lang])
 
   const setLang = (newLang: Lang) => {
     setLangState(newLang)
+    try {
+      localStorage.setItem("aniline-lang", newLang)
+    } catch {
+      // ignore
+    }
   }
 
   return (

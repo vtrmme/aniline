@@ -18,7 +18,8 @@ export interface Episode {
   numero: number
   title_es?: string
   title_en?: string
-  video_url: string
+  video_url?: string | null
+  youtube_url?: string | null
   orden?: number
 }
 

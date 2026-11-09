@@ -1,11 +1,21 @@
 import { createServerClient } from "@/lib/supabase"
 import { searchAnimes, mapAnilistToAnime } from "@/lib/anilist"
 import { NextResponse } from "next/server"
+import { rateLimit } from "@/lib/rate-limit"
 
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!SERVICE_ROLE_KEY) {
   throw new Error("SUPABASE_SERVICE_ROLE_KEY no está definida en las variables de entorno")
+}
+
+function obtenerIP(req: Request): string {
+  const headers = req.headers as unknown as Record<string, string>
+  return (
+    headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    headers["x-real-ip"] ||
+    "desconocido"
+  )
 }
 
 interface EpisodeInsert {
@@ -96,7 +106,16 @@ async function syncAnimes() {
   return { inserted, updated, errors }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const ip = obtenerIP(req)
+  const limite = rateLimit({ clave: `sync:${ip}`, maximo: 2, ventanaSegundos: 3600 })
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { ok: false, error: "Sincronización limitada. Intenta de nuevo más tarde." },
+      { status: 429 }
+    )
+  }
+
   try {
     const result = await syncAnimes()
     return NextResponse.json({

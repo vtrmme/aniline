@@ -11,4 +11,9 @@
     color: var(--foreground);
     font-family: Arial, Helvetica, sans-serif;
   }
+
+  .dark {
+    --background: #050505;
+    --foreground: #f8fafc;
+  }
 }

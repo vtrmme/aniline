@@ -1,9 +1,27 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
+import { rateLimit } from "@/lib/rate-limit"
 
 const BUCKET = "episode-videos"
 
+function obtenerIP(req: Request): string {
+  const headers = req.headers as unknown as Record<string, string>
+  return (
+    headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    headers["x-real-ip"] ||
+    "desconocido"
+  )
+}
+
 export async function POST(req: Request) {
+  const ip = obtenerIP(req)
+  const limite = rateLimit({ clave: `upload:${ip}`, maximo: 5, ventanaSegundos: 60 })
+  if (!limite.permitido) {
+    return NextResponse.json(
+      { ok: false, error: "Demasiadas solicitudes. Intenta de nuevo más tarde." },
+      { status: 429 }
+    )
+  }
   try {
     const { animeId, episodeNumber, fileName } = await req.json()
 

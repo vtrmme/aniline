@@ -77,7 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     }
 
     // Obtener email del usuario objetivo para mostrarlo
-    const { data: users, error: userError } = await supabase.auth.admin.listUsers()
+    const { data: listUsers, error: userError } = await supabase.auth.admin.listUsers()
     if (userError) {
       return NextResponse.json(
         { ok: false, error: userError.message },
@@ -85,7 +85,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       )
     }
 
-    const targetUser = (users || []).find((u: AdminUser) => u.id === target_user_id)
+    const users = listUsers?.users || []
+    const targetUser = users.find((u: AdminUser) => u.id === target_user_id)
     const targetEmail = targetUser?.email || "Desconocido"
 
     return NextResponse.json({

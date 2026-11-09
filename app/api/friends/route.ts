@@ -150,7 +150,7 @@ export async function POST(req: Request) {
 
     const supabase = createServerClient()
 
-    const { data: users, error: userError } = await supabase.auth.admin.listUsers()
+    const { data: listUsers, error: userError } = await supabase.auth.admin.listUsers()
     if (userError) {
       return NextResponse.json(
         { ok: false, error: userError.message },
@@ -158,7 +158,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const targetUser = (users || []).find((u: AdminUser) => u.email === friend_email)
+    const users = listUsers?.users || []
+    const targetUser = users.find((u: AdminUser) => u.email === friend_email)
     if (!targetUser) {
       return NextResponse.json(
         { ok: false, error: "Usuario no encontrado" },

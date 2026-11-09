@@ -77,7 +77,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     }
 
     // Obtener email del usuario objetivo para mostrarlo
-    const { data: listUsers, error: userError } = await supabase.auth.admin.listUsers()
+    const { data: listUsers, error: userError } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    })
     if (userError) {
       return NextResponse.json(
         { ok: false, error: userError.message },

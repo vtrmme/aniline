@@ -1,8 +1,11 @@
 -- Tabla de amistades entre usuarios
 -- Ejecutar en el SQL Editor de Supabase
--- Usamos email (texto) como identificador común entre NextAuth y Supabase Auth
+-- Usamos email como identificador común entre NextAuth y Supabase Auth
 
-CREATE TABLE IF NOT EXISTS friendships (
+-- ⚠️ Esto eliminará la tabla si ya existe (solo datos de amistades, no afecta otros datos)
+DROP TABLE IF EXISTS friendships;
+
+CREATE TABLE friendships (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_email TEXT NOT NULL,
   friend_email TEXT NOT NULL,
@@ -20,7 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
 -- Habilitar RLS
 ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
 
--- Políticas RLS (usando email en lugar de auth.uid())
+-- Políticas RLS (usando email)
 CREATE POLICY "Users can view their own friendships" ON friendships
   FOR SELECT USING (true);
 

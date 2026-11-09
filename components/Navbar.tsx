@@ -108,15 +108,6 @@ export function Navbar() {
                 >
                   {t(lang, "navPerfil")}
                 </Link>
-                <Link
-                  href="/friends"
-                  className={cn(
-                    "text-sm font-medium transition-colors",
-                    isActive("/friends") ? "text-red-600" : "text-gray-300 hover:text-white"
-                  )}
-                >
-                  {t(lang, "navFriends")}
-                </Link>
               </>
             ) : null}
           </div>

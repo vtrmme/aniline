@@ -24,8 +24,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const { anime_id, estado } = await req.json()
-    console.log("Watchlist POST: anime_id=", anime_id, "estado=", estado)
+    const { anime_id, estado, puntuacion } = await req.json()
+    console.log("Watchlist POST: anime_id=", anime_id, "estado=", estado, "puntuacion=", puntuacion)
 
     if (!anime_id || !estado) {
       return NextResponse.json(
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     if (existing) {
       const { error } = await supabase
         .from("watchlists")
-        .update({ estado })
+        .update({ estado, puntuacion })
         .eq("id", existing.id)
 
       if (error) {
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         )
       }
 
-      return NextResponse.json({ ok: true, action: "updated", estado })
+      return NextResponse.json({ ok: true, action: "updated", estado, puntuacion })
     }
 
     const { error } = await supabase
@@ -77,6 +77,7 @@ export async function POST(req: Request) {
         user_id,
         anime_id,
         estado,
+        puntuacion,
       })
 
     if (error) {
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json({ ok: true, action: "created", estado })
+    return NextResponse.json({ ok: true, action: "created", estado, puntuacion })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido"
     console.error("Watchlist POST catch error:", err)

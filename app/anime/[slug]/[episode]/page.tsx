@@ -22,6 +22,8 @@ export default function EpisodePage({
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [historialItem, setHistorialItem] = useState<{ episodio_numero: number } | null>(null)
+  const [nextEpisodeUrl, setNextEpisodeUrl] = useState<string | null>(null)
+  const [nextEpisodeNum, setNextEpisodeNum] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [slug, setSlug] = useState<string | null>(null)
@@ -104,6 +106,27 @@ export default function EpisodePage({
             body: JSON.stringify({ anime_id: animeData.id, episodio_numero: num }),
           })
         }
+
+        // Preload del siguiente episodio
+        const { data: nextEp } = await supabase
+          .from("episodes")
+          .select("numero, video_url, youtube_url")
+          .eq("anime_id", animeData.id)
+          .eq("numero", num + 1)
+          .single()
+
+        if (nextEp) {
+          setNextEpisodeNum(nextEp.numero)
+          if (nextEp.youtube_url) {
+            setNextEpisodeUrl(null)
+          } else if (nextEp.video_url) {
+            const res = await fetch(`/api/videos/play?path=${encodeURIComponent(nextEp.video_url)}`)
+            if (res.ok) {
+              const json = await res.json()
+              setNextEpisodeUrl(json.videoUrl || null)
+            }
+          }
+        }
       } catch (err) {
         console.error("Error cargando episodio:", err)
       } finally {
@@ -175,6 +198,17 @@ export default function EpisodePage({
             </div>
           )}
           <VideoPlayer videoUrl={videoUrl} youtubeUrl={youtubeUrl} />
+          {nextEpisodeUrl || nextEpisodeNum && (
+            <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Siguiente episodio</p>
+              <Link
+                href={`/anime/${anime.slug}/${nextEpisodeNum}`}
+                className="block w-full py-3 px-4 text-center text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition"
+              >
+                {t(lang, "episodeWatch")} #{nextEpisodeNum}
+              </Link>
+            </div>
+          )}
         </>
       )}
 

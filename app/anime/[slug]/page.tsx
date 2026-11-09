@@ -27,8 +27,9 @@ export default function AnimeDetail({
   const [anime, setAnime] = useState<AnimeWithEpisodes | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [watchlistItem, setWatchlistItem] = useState<{ estado: string } | null>(null)
+  const [watchlistItem, setWatchlistItem] = useState<{ estado: string; puntuacion?: number } | null>(null)
   const [watchlistLoading, setWatchlistLoading] = useState(false)
+  const [puntuacion, setPuntuacionState] = useState<number | null>(null)
   const [similares, setSimilares] = useState<Anime[]>([])
 
   useEffect(() => {
@@ -84,7 +85,8 @@ export default function AnimeDetail({
         const res = await fetch(`/api/watchlist?anime_id=${animeId}`)
         if (res.ok) {
           const json = await res.json()
-          setWatchlistItem(json.inList ? { estado: json.estado } : null)
+          setWatchlistItem(json.inList ? { estado: json.estado, puntuacion: json.puntuacion } : null)
+          setPuntuacionState(json.inList ? (json.puntuacion || null) : null)
         }
       } catch {
         // ignore
@@ -104,19 +106,35 @@ export default function AnimeDetail({
       })
       if (res.ok) {
         setWatchlistItem(null)
+        setPuntuacionState(null)
       }
     } else {
       const res = await fetch("/api/watchlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anime_id: animeId, estado }),
+        body: JSON.stringify({ anime_id: animeId, estado, puntuacion }),
       })
       if (res.ok) {
         const json = await res.json()
-        setWatchlistItem({ estado: json.estado })
+        setWatchlistItem({ estado: json.estado, puntuacion: json.puntuacion })
+        setPuntuacionState(json.puntuacion || null)
       }
     }
     setWatchlistLoading(false)
+  }
+
+  const setPuntuacion = async (valor: number) => {
+    if (!userId || !animeId) return
+    const res = await fetch("/api/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anime_id: animeId, estado: watchlistItem?.estado || "para_ver", puntuacion: valor }),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      setWatchlistItem({ estado: json.estado, puntuacion: json.puntuacion })
+      setPuntuacionState(json.puntuacion || null)
+    }
   }
 
   const estadoOptions: { value: string; label: string }[] = [
@@ -245,6 +263,33 @@ export default function AnimeDetail({
                       {opt.label}
                     </button>
                   ))}
+                </div>
+              )}
+              {watchlistItem && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-400 mb-2">Tu puntuación</p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setPuntuacion(v)}
+                        disabled={watchlistLoading}
+                        className={cn(
+                          "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition",
+                          puntuacion === v
+                            ? "bg-yellow-500 text-black"
+                            : "bg-gray-700 text-gray-400 hover:text-yellow-400"
+                        )}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                  {puntuacion && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {t(lang, "animeDetailScore")}: {`${puntuacion} / 10`}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

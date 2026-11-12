@@ -2,18 +2,240 @@
 
 @layer base {
   :root {
-    --background: #0f0f0f;
-    --foreground: #ffffff;
-  }
+    /* ── Paleta AniLine (tema oscuro premium) ─────────────── */
+    --bg: #0b0c0e;
+    --bg-elevated: #141517;
+    --surface: #1e1f22;
+    --surface-hover: #26272b;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
 
-  body {
-    background: var(--background);
-    color: var(--foreground);
-    font-family: Arial, Helvetica, sans-serif;
+    --foreground: #f5f5f6;
+    --muted: #9ca3af;
+    --muted-dim: #6b7280;
+
+    /* ── Marca ────────────────────────────────────────────── */
+    --brand: #e50914;
+    --brand-bright: #ff2e4c;
+    --brand-soft: rgba(229, 9, 20, 0.16);
+
+    --gold: #f5a623;
+    --gold-deep: #d4af37;
+    --gold-soft: rgba(245, 166, 35, 0.16);
+
+    /* ── Tipografía ───────────────────────────────────────── */
+    --font-ui: var(--font-plus-jakarta), "Inter", system-ui, sans-serif;
+    --font-display: var(--font-outfit), var(--font-plus-jakarta), system-ui, sans-serif;
+
+    /* ── Sombras y radios ─────────────────────────────────── */
+    --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.45);
+    --shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.6);
+    --radius-card: 0.75rem;
+    --radius-pill: 9999px;
+
+    /* Compatibilidad con variables previas */
+    --background: var(--bg);
+    --foreground: var(--foreground);
   }
 
   .dark {
     --background: #050505;
     --foreground: #f8fafc;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--foreground);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  /* ── Focus visible pulido ───────────────────────────────── */
+  :focus-visible {
+    outline: 2px solid var(--brand-bright);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── Scrollbar oscura y discreta ────────────────────────── */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3a3b40 transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #3a3b40;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #52535a;
+    background-clip: content-box;
+    border: 2px solid transparent;
+  }
+}
+
+@layer utilities {
+  /* ── Barra de navegación glassmorphism ──────────────────── */
+  .glass {
+    background: rgba(11, 12, 14, 0.72);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .glass-panel {
+    background: rgba(30, 31, 34, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Skeleton shimmer ───────────────────────────────────── */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+    animation: skeleton-shimmer 1.6s infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* ── Carruseles: scroll horizontal sin barras visibles ──── */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Degradados de legibilidad sobre banners ────────────── */
+  .gradient-hero {
+    background: linear-gradient(
+        to top,
+        var(--bg) 0%,
+        rgba(11, 12, 14, 0.72) 32%,
+        rgba(11, 12, 14, 0.18) 62%,
+        transparent 100%
+      ),
+      linear-gradient(
+        to right,
+        rgba(11, 12, 14, 0.92) 0%,
+        rgba(11, 12, 14, 0.55) 38%,
+        transparent 72%
+      );
+  }
+
+  .gradient-card {
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.92) 0%,
+      rgba(0, 0, 0, 0.45) 45%,
+      transparent 100%
+    );
+  }
+
+  /* ── Botón de marca ─────────────────────────────────────── */
+  .btn-brand {
+    background: var(--brand);
+    color: #fff;
+    transition: background 0.2s ease, transform 0.15s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .btn-brand:hover {
+    background: var(--brand-bright);
+    box-shadow: 0 8px 24px rgba(229, 9, 20, 0.35);
+    transform: translateY(-1px);
+  }
+
+  .btn-brand:active {
+    transform: translateY(0);
+  }
+
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-strong);
+    color: #fff;
+    backdrop-filter: blur(8px);
+    transition: background 0.2s ease, border-color 0.2s ease,
+      transform 0.15s ease;
+  }
+
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.28);
+    transform: translateY(-1px);
+  }
+
+  /* ── Badges ─────────────────────────────────────────────── */
+  .badge-gold {
+    background: var(--gold-soft);
+    color: var(--gold);
+    border: 1px solid rgba(245, 166, 35, 0.35);
+  }
+
+  .badge-brand {
+    background: var(--brand-soft);
+    color: var(--brand-bright);
+    border: 1px solid rgba(229, 9, 20, 0.35);
+  }
+
+  /* ── Modo cine: oscurece el entorno del reproductor ─────── */
+  .cinema-bg {
+    background: radial-gradient(
+        ellipse at center,
+        #000 0%,
+        #050506 55%,
+        var(--bg) 100%
+      );
   }
 }

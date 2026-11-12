@@ -2,8 +2,9 @@ import type { Anime } from "@/types"
 
 const ANILIST_API_URL = "https://graphql.anilist.co"
 
-interface AnilistMedia {
+export interface AnilistMedia {
   id: number
+  idMal?: number | null
   title: {
     romaji?: string
     english?: string
@@ -28,6 +29,8 @@ interface AnilistMedia {
   synonyms?: string[]
   averageScore?: number
   popularity?: number
+  trailer?: { id?: string; site?: string } | null
+  studios?: { nodes?: Array<{ name?: string }> } | null
   coverImage?: {
     large?: string
     medium?: string
@@ -41,22 +44,9 @@ interface AnilistResponse<T> {
   errors?: Array<{ message: string }>
 }
 
-export async function fetchAnilistMedia(
-  variables: Record<string, unknown>,
-  query?: string
-): Promise<AnilistMedia[]> {
-  const graphqlQuery = `
-    query ($page: Int, $perPage: Int, $search: String, $type: MediaType, $format: MediaFormat, $status: MediaStatus, $genre: String, $sort: [MediaSort]) {
-      Page(page: $page, perPage: $perPage) {
-        media(
-          search: $search
-          type: $type
-          format: $format
-          status: $status
-          genre: $genre
-          sort: $sort
-        ) {
+const MEDIA_FIELDS = `
           id
+          idMal
           title {
             romaji
             english
@@ -79,38 +69,97 @@ export async function fetchAnilistMedia(
           synonyms
           averageScore
           popularity
+          trailer { id site }
+          studios(isMain: true) { nodes { name } }
           coverImage { large medium color }
           bannerImage
+`
+
+function dormir(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function postAnilist(
+  query: string,
+  variables: Record<string, unknown>
+): Promise<AnilistResponse<AnilistMedia>> {
+  let ultimoError = "Error desconocido de AniList"
+
+  for (let intento = 1; intento <= 4; intento++) {
+    const response = await fetch(ANILIST_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+      next: { revalidate: 3600 },
+    })
+
+    if (response.status === 429) {
+      const esperaMs = 2000 * intento
+      ultimoError = "AniList limitó las peticiones (429)"
+      await dormir(esperaMs)
+      continue
+    }
+
+    if (!response.ok) {
+      ultimoError = `AniList respondió con estado ${response.status}`
+      await dormir(1500 * intento)
+      continue
+    }
+
+    return (await response.json()) as AnilistResponse<AnilistMedia>
+  }
+
+  throw new Error(ultimoError)
+}
+
+export async function fetchAnilistMedia(
+  variables: Record<string, unknown>,
+  query?: string
+): Promise<AnilistMedia[]> {
+  const graphqlQuery = `
+    query ($page: Int, $perPage: Int, $search: String, $type: MediaType, $format: MediaFormat, $status: MediaStatus, $genre: String, $sort: [MediaSort], $status_in: [MediaStatus], $format_in: [MediaFormat]) {
+      Page(page: $page, perPage: $perPage) {
+        media(
+          search: $search
+          type: $type
+          format: $format
+          status: $status
+          genre: $genre
+          sort: $sort
+          status_in: $status_in
+          format_in: $format_in
+        ) {
+${MEDIA_FIELDS}
         }
       }
     }
   `
 
+  const hayBusqueda = !!query && query.trim().length > 0
+
   const fetchVars: Record<string, unknown> = {
     page: variables.page || 1,
     perPage: variables.perPage || 50,
     type: "ANIME",
-    sort: ["POPULARITY_DESC", "TRENDING_DESC"],
+    sort: hayBusqueda
+      ? ["RELEVANCE"]
+      : (variables.sort as string[] | undefined) || ["POPULARITY_DESC"],
   }
 
-  if (query && query.trim()) {
-    fetchVars.search = query.trim()
+  if (hayBusqueda) {
+    fetchVars.search = query!.trim()
+  }
+  if (variables.statusIn) {
+    fetchVars.status_in = variables.statusIn
+  }
+  if (variables.formatIn) {
+    fetchVars.format_in = variables.formatIn
   }
 
-  const response = await fetch(ANILIST_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      query: graphqlQuery,
-      variables: fetchVars,
-    }),
-    next: { revalidate: 3600 },
-  })
-
-  const json: AnilistResponse<AnilistMedia> = await response.json()
+  const json = await postAnilist(graphqlQuery, fetchVars)
 
   if (json.errors) {
     const errorMessages = json.errors.map((e) => e.message).join(", ")
@@ -118,6 +167,23 @@ export async function fetchAnilistMedia(
   }
 
   return json.data?.Page?.media || []
+}
+
+function mapEstado(status?: string): string | undefined {
+  switch (status) {
+    case "RELEASING":
+      return "en emisión"
+    case "FINISHED":
+      return "emitido"
+    case "CANCELLED":
+      return "cancelado"
+    case "HIATUS":
+      return "hiatus"
+    case "UPCOMING":
+      return "próximamente"
+    default:
+      return undefined
+  }
 }
 
 export function mapAnilistToAnime(media: AnilistMedia): Omit<Anime, "id"> {
@@ -133,10 +199,21 @@ export function mapAnilistToAnime(media: AnilistMedia): Omit<Anime, "id"> {
   const sinopsisEs = sinopsisEn
 
   const slug = generateSlug(titleEs, media.id)
+  const puntuacion =
+    typeof media.averageScore === "number" && media.averageScore > 0
+      ? Math.round(media.averageScore) / 10
+      : undefined
+  const estudio = media.studios?.nodes?.[0]?.name
+  const trailer_url =
+    media.trailer?.site === "youtube" && media.trailer.id
+      ? `https://www.youtube.com/watch?v=${media.trailer.id}`
+      : undefined
+  const episodios_count = computeTotalEpisodes(media)
 
   return {
     slug,
     anilist_id: media.id,
+    mal_id: typeof media.idMal === "number" ? media.idMal : null,
     title_es: titleEs,
     title_en: titleEn,
     sinopsis_es: sinopsisEs,
@@ -145,6 +222,12 @@ export function mapAnilistToAnime(media: AnilistMedia): Omit<Anime, "id"> {
     banner_url,
     genero,
     anio: year,
+    estado: mapEstado(media.status),
+    tipo: media.format,
+    estudio,
+    puntuacion,
+    episodios_count,
+    trailer_url,
   }
 }
 
@@ -173,7 +256,7 @@ export async function fetchPopularAnimes(perPage: number = 24): Promise<AnilistM
 }
 
 export function computeTotalEpisodes(
-  media: Pick<AnilistMedia, "episodes" | "nextAiringEpisode">,
+  media: Pick<AnilistMedia, "episodes" | "nextAiringEpisode" | "status">,
   existingCount: number = 0
 ): number {
   const declarado = typeof media.episodes === "number" && media.episodes > 0 ? media.episodes : 0
@@ -181,7 +264,26 @@ export function computeTotalEpisodes(
   const emitidos = typeof alAire === "number" && alAire > 1 ? alAire - 1 : 0
 
   const total = Math.max(declarado, emitidos, existingCount)
-  return total > 0 ? total : 12
+  if (total > 0) return total
+  // Animes por estrenar: aún no tienen episodios (no inventar 12)
+  if (media.status === "UPCOMING") return 0
+  return 12
+}
+
+export const CATALOG_FORMATS = ["TV", "TV_SHORT", "MOVIE", "SPECIAL", "OVA", "ONA"]
+export const CATALOG_STATUSES = ["RELEASING", "FINISHED", "CANCELLED", "HIATUS"]
+
+export async function fetchCatalogPage(
+  page: number,
+  perPage: number = 50
+): Promise<AnilistMedia[]> {
+  return fetchAnilistMedia({
+    page,
+    perPage,
+    statusIn: CATALOG_STATUSES,
+    formatIn: CATALOG_FORMATS,
+    sort: ["POPULARITY_DESC"],
+  })
 }
 
 export async function searchAnimes(query: string, perPage: number = 20): Promise<AnilistMedia[]> {
@@ -193,6 +295,7 @@ export async function fetchAnimeById(anilistId: number): Promise<AnilistMedia | 
     query ($id: Int) {
       Media(id: $id, type: ANIME) {
         id
+        idMal
         title { romaji english native userPreferred }
         description
         startDate { year month day }
@@ -203,26 +306,15 @@ export async function fetchAnimeById(anilistId: number): Promise<AnilistMedia | 
         duration
         genres tags { name }
         synonyms averageScore popularity
+        trailer { id site }
+        studios(isMain: true) { nodes { name } }
         coverImage { large medium color }
         bannerImage
       }
     }
   `
 
-  const response = await fetch(ANILIST_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      query: graphqlQuery,
-      variables: { id: anilistId },
-    }),
-    next: { revalidate: 3600 },
-  })
-
-  const json: AnilistResponse<AnilistMedia> = await response.json()
+  const json = await postAnilist(graphqlQuery, { id: anilistId })
 
   if (json.errors) {
     return null

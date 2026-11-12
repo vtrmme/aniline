@@ -6,6 +6,8 @@ import { VideoPlayer } from "@/components/VideoPlayer"
 import { EpisodePlayer, type StreamServerInfo } from "@/components/EpisodePlayer"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
+import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react"
+import { cn } from "@/lib/utils"
 import type { Anime, Episode } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
@@ -35,6 +37,8 @@ export default function EpisodePage({
   const [savedSeconds, setSavedSeconds] = useState(0)
   const [nextEpisodeUrl, setNextEpisodeUrl] = useState<string | null>(null)
   const [nextEpisodeNum, setNextEpisodeNum] = useState<number | null>(null)
+  const [prevEpisodeNum, setPrevEpisodeNum] = useState<number | null>(null)
+  const [episodesList, setEpisodesList] = useState<{ numero: number; title_es?: string | null }[]>([])
   const [loading, setLoading] = useState(true)
   const [streamData, setStreamData] = useState<StreamData | null>(null)
   const [streamLang, setStreamLang] = useState<StreamLang>("sub")
@@ -123,6 +127,22 @@ export default function EpisodePage({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ anime_id: animeData.id, episodio_numero: num }),
           })
+        }
+
+        // Lista completa de episodios para el selector y navegación prev/next
+        const { data: lista } = await supabase
+          .from("episodes")
+          .select("numero, title_es, title_en")
+          .eq("anime_id", animeData.id)
+          .order("numero", { ascending: true })
+
+        if (Array.isArray(lista)) {
+          const ordenados = (lista as { numero: number; title_es?: string | null }[]).sort(
+            (a, b) => a.numero - b.numero
+          )
+          setEpisodesList(ordenados)
+          const anteriores = ordenados.filter((e) => e.numero < num)
+          setPrevEpisodeNum(anteriores.length > 0 ? anteriores[anteriores.length - 1].numero : null)
         }
 
         // Preload del siguiente episodio
@@ -221,9 +241,9 @@ export default function EpisodePage({
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center text-gray-400">
-          <div className="animate-pulse rounded-full h-12 w-12 bg-gray-800 mb-4"></div>
+          <div className="mb-4 h-12 w-12 animate-pulse rounded-full bg-[var(--surface)]" />
           Cargando episodio...
         </div>
       </div>
@@ -232,9 +252,9 @@ export default function EpisodePage({
 
   if (!anime || !episodeData) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center text-gray-400">
-          <p className="text-gray-400 text-center p-8">Episodio no encontrado</p>
+          <p className="p-8 text-center text-gray-400">Episodio no encontrado</p>
         </div>
       </div>
     )
@@ -248,102 +268,147 @@ export default function EpisodePage({
   const showPlayer = !!streamData || !!videoUrl || !!youtubeUrl
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <nav className="mb-6 flex items-center gap-2 text-sm">
-        <Link
-          href={`/anime/${anime.slug}`}
-          className="text-gray-400 hover:text-white"
-        >
-          {title}
-        </Link>
-        <span className="text-gray-600">/</span>
-        <span className="text-white">{t(lang, "episodeWatch")} {episodeData.numero}</span>
-      </nav>
+    <div className="cinema-bg min-h-[calc(100vh-4rem)] pb-16">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <nav className="mb-4 flex items-center gap-2 text-sm">
+          <Link
+            href={`/anime/${anime.slug}`}
+            className="text-gray-400 transition hover:text-white"
+          >
+            {title}
+          </Link>
+          <span className="text-gray-600">/</span>
+          <span className="text-white">
+            {t(lang, "episodeWatch")} {episodeData.numero}
+          </span>
+        </nav>
 
-      {!showPlayer ? (
-        <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl aspect-video w-full flex items-center justify-center">
-          <p className="text-gray-400 text-center p-8">
-            {t(lang, "episodeNotAvailable") || "Video no disponible aún"}
-          </p>
-        </div>
-      ) : (
-        <>
-          {historialItem && historialItem.episodio_numero < episodeData.numero && (
-            <div className="mb-4 bg-blue-600/20 border border-blue-600/30 text-blue-100 rounded-xl px-4 py-3 flex items-center gap-2">
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">
-                {t(lang, "episodeHistory")}
-              </span>
-              <Link
-                href={`/anime/${anime.slug}/${historialItem.episodio_numero}`}
-                className="text-sm text-blue-300 hover:text-white underline underline-offset-4"
-              >
-                {t(lang, "episodeResume")} #{historialItem.episodio_numero}
-              </Link>
+        {!showPlayer ? (
+          <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl bg-black/60 shadow-2xl ring-1 ring-white/10">
+            <p className="p-8 text-center text-gray-400">
+              {t(lang, "episodeNotAvailable") || "Video no disponible aún"}
+            </p>
+          </div>
+        ) : (
+          <>
+            {historialItem && historialItem.episodio_numero < episodeData.numero && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+                  {t(lang, "episodeHistory")}
+                </span>
+                <Link
+                  href={`/anime/${anime.slug}/${historialItem.episodio_numero}`}
+                  className="text-sm text-blue-300 underline underline-offset-4 transition hover:text-white"
+                >
+                  {t(lang, "episodeResume")} #{historialItem.episodio_numero}
+                </Link>
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-xl bg-black shadow-[var(--shadow-elevated)] ring-1 ring-white/10">
+              {streamData && streamData.servers.length > 0 ? (
+                <EpisodePlayer
+                  key={`${anime.slug}:${episodeData.numero}`}
+                  servers={streamData.servers}
+                  anilistId={streamData.anilistId}
+                  episode={episodeData.numero}
+                  lang={streamLang}
+                  onLangChange={setStreamLang}
+                  nativeUrl={streamData.nativeUrl || videoUrl}
+                  youtubeUrl={streamData.youtubeUrl || youtubeUrl}
+                  hlsUrl={streamData.hlsUrl}
+                  storageKey={`${anime.slug}:${episodeData.numero}`}
+                  initialSeconds={savedSeconds}
+                  onProgress={saveProgress}
+                  onMarkWatched={handleMarkWatched}
+                  labels={{
+                    markWatched: t(lang, "serverMarkWatched"),
+                    sub: t(lang, "serverSub"),
+                    dub: t(lang, "serverDub"),
+                    notAvailable: t(lang, "episodeNotAvailable"),
+                    invalidYoutube: "URL de YouTube inválida",
+                    noServers: t(lang, "serverNoServers"),
+                  }}
+                />
+              ) : (
+                <VideoPlayer videoUrl={videoUrl} youtubeUrl={youtubeUrl} />
+              )}
             </div>
-          )}
 
-          {streamData && streamData.servers.length > 0 ? (
-            <EpisodePlayer
-              key={`${anime.slug}:${episodeData.numero}`}
-              servers={streamData.servers}
-              anilistId={streamData.anilistId}
-              episode={episodeData.numero}
-              lang={streamLang}
-              onLangChange={setStreamLang}
-              nativeUrl={streamData.nativeUrl || videoUrl}
-              youtubeUrl={streamData.youtubeUrl || youtubeUrl}
-              hlsUrl={streamData.hlsUrl}
-              storageKey={`${anime.slug}:${episodeData.numero}`}
-              initialSeconds={savedSeconds}
-              onProgress={saveProgress}
-              onMarkWatched={handleMarkWatched}
-              labels={{
-                markWatched: t(lang, "serverMarkWatched"),
-                sub: t(lang, "serverSub"),
-                dub: t(lang, "serverDub"),
-                notAvailable: t(lang, "episodeNotAvailable"),
-                invalidYoutube: "URL de YouTube inválida",
-                noServers: t(lang, "serverNoServers"),
-              }}
-            />
-          ) : (
-            <VideoPlayer videoUrl={videoUrl} youtubeUrl={youtubeUrl} />
-          )}
+            <div className="mt-4 flex items-center justify-between gap-3">
+              {prevEpisodeNum !== null ? (
+                <Link
+                  href={`/anime/${anime.slug}/${prevEpisodeNum}`}
+                  className="btn-ghost inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
+                >
+                  <ChevronLeft size={16} />
+                  {t(lang, "episodePrev")} #{prevEpisodeNum}
+                </Link>
+              ) : (
+                <span />
+              )}
 
-          {nextEpisodeUrl || nextEpisodeNum && (
-            <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
-              <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Siguiente episodio</p>
-              <Link
-                href={`/anime/${anime.slug}/${nextEpisodeNum}`}
-                className="block w-full py-3 px-4 text-center text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition"
-              >
-                {t(lang, "episodeWatch")} #{nextEpisodeNum}
-              </Link>
+              {(nextEpisodeUrl || nextEpisodeNum) && nextEpisodeNum !== null && (
+                <Link
+                  href={`/anime/${anime.slug}/${nextEpisodeNum}`}
+                  className="btn-brand inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
+                >
+                  {t(lang, "episodeNext")} #{nextEpisodeNum}
+                  <ChevronRight size={16} />
+                </Link>
+              )}
             </div>
-          )}
-        </>
-      )}
+          </>
+        )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
-        <div className="lg:col-span-8">
-          <h2 className="text-2xl font-bold text-white mb-2">{epTitle}</h2>
-          <p className="text-gray-400 whitespace-pre-line">{sinopsis}</p>
-        </div>
-        <div className="lg:col-span-4">
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <h3 className="font-bold text-white mb-4">{t(lang, "episodeInfo")}</h3>
-            <p className="text-sm text-gray-400 mb-2">
-              <span className="font-semibold text-white">Anime:</span>{" "}
-              {title}
-            </p>
-            <p className="text-sm text-gray-400 mb-2">
-              <span className="font-semibold text-white">Episodio:</span>{" "}
-              {episodeData.numero}
-            </p>
-            <p className="text-sm text-gray-400">
-              <span className="font-semibold text-white">{t(lang, "animeDetailGenre")}:</span>{" "}
-              {anime.genero?.join(", ")}
-            </p>
+        {episodesList.length > 0 && (
+          <div className="glass-panel mt-8 rounded-2xl p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <LayoutGrid size={16} className="text-[var(--brand-bright)]" />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-300">
+                {t(lang, "episodeSelect")}
+              </h3>
+            </div>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+              {episodesList.map((ep) => (
+                <Link
+                  key={ep.numero}
+                  href={`/anime/${anime.slug}/${ep.numero}`}
+                  className={cn(
+                    "flex h-9 items-center justify-center rounded-lg text-xs font-bold transition",
+                    ep.numero === episodeData.numero
+                      ? "bg-[var(--brand)] text-white shadow-[0_4px_16px_rgba(229,9,20,0.35)]"
+                      : "bg-white/5 text-gray-300 hover:bg-white/12 hover:text-white"
+                  )}
+                >
+                  {ep.numero}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <h2 className="mb-2 text-2xl font-bold text-white">{epTitle}</h2>
+            <p className="whitespace-pre-line text-gray-400">{sinopsis}</p>
+          </div>
+          <div className="lg:col-span-4">
+            <div className="glass-panel rounded-2xl p-6">
+              <h3 className="mb-4 font-bold text-white">{t(lang, "episodeInfo")}</h3>
+              <p className="mb-2 text-sm text-gray-400">
+                <span className="font-semibold text-white">Anime:</span>{" "}
+                {title}
+              </p>
+              <p className="mb-2 text-sm text-gray-400">
+                <span className="font-semibold text-white">Episodio:</span>{" "}
+                {episodeData.numero}
+              </p>
+              <p className="text-sm text-gray-400">
+                <span className="font-semibold text-white">{t(lang, "animeDetailGenre")}:</span>{" "}
+                {anime.genero?.join(", ")}
+              </p>
+            </div>
           </div>
         </div>
       </div>

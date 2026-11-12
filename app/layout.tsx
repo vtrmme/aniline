@@ -1,11 +1,21 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Plus_Jakarta_Sans, Outfit } from "next/font/google"
 import "./globals.css"
 import { Navbar } from "@/components/Navbar"
 import { Providers } from "@/app/providers"
 import { LanguageProvider } from "@/contexts/LanguageContext"
 
-const inter = Inter({ subsets: ["latin"] })
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
+})
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
   title: {
@@ -34,11 +44,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="scroll-smooth">
-      <body className={`${inter.className} bg-[#0f0f0f] text-white antialiased dark:bg-[#050505] dark:text-gray-100`}>
+      <body
+        className={`${plusJakarta.variable} ${outfit.variable} bg-[#0B0C0E] text-white antialiased`}
+      >
         <LanguageProvider>
           <Providers>
             <Navbar />
-            <main className="pt-20 min-h-screen">{children}</main>
+            <main className="pt-16 min-h-screen">{children}</main>
           </Providers>
         </LanguageProvider>
       </body>

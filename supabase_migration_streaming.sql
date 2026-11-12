@@ -63,3 +63,11 @@ ALTER TABLE episodes ADD COLUMN IF NOT EXISTS sinopsis_en TEXT;
 ALTER TABLE watchlists ADD COLUMN IF NOT EXISTS puntuacion REAL;
 ALTER TABLE watchlists ADD COLUMN IF NOT EXISTS progreso INTEGER;
 ALTER TABLE watchlists ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- 7. Catálogo ampliado (AniList + Jikan/MAL)
+ALTER TABLE animes ADD COLUMN IF NOT EXISTS mal_id INTEGER;
+ALTER TABLE animes ADD COLUMN IF NOT EXISTS puntuacion_mal REAL;
+
+-- Índice único en anilist_id para upserts del sync de catálogo
+-- (Postgres permite múltiples NULL en índices únicos)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_animes_anilist_id_unique ON animes(anilist_id);

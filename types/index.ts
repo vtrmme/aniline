@@ -2,6 +2,7 @@ export interface Anime {
   id: string
   slug: string
   anilist_id?: number | null
+  mal_id?: number | null
   title_es: string
   title_en?: string
   sinopsis_es?: string
@@ -15,6 +16,7 @@ export interface Anime {
   tipo?: string
   estudio?: string
   puntuacion?: number
+  puntuacion_mal?: number | null
   episodios_count?: number
   trailer_url?: string
   created_at?: string

@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { AnimeCard } from "@/components/AnimeCard"
+import { SkeletonAnimeCard } from "@/components/SkeletonAnimeCard"
 import type { Anime } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
@@ -61,13 +61,13 @@ export default function Lista() {
   const estadoColor = (estado: string) => {
     switch (estado) {
       case "visto":
-        return "bg-green-600"
+        return "bg-emerald-600/90"
       case "viendo":
-        return "bg-blue-600"
+        return "bg-blue-600/90"
       case "para_ver":
-        return "bg-yellow-600"
+        return "bg-amber-500/90 text-black"
       default:
-        return "bg-gray-600"
+        return "bg-gray-600/90"
     }
   }
 
@@ -101,50 +101,62 @@ export default function Lista() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center text-gray-400">
-        <div className="animate-pulse rounded-full h-10 w-10 bg-gray-800 mx-auto mb-3"></div>
-        {t(lang, "navMyList")}
+      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonAnimeCard key={i} />
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-3xl font-bold text-white mb-8">{t(lang, "myListTitle")}</h1>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <h1 className="mb-8 text-3xl font-bold text-white">{t(lang, "myListTitle")}</h1>
       {items.length === 0 ? (
-        <p className="text-gray-400 text-center py-20">
+        <p className="py-20 text-center text-gray-400">
           {t(lang, "myListEmpty")}
         </p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-          {items.map(({ anime, estado, puntuacion }) => {
-            const title = lang === "es" ? anime.title_es : anime.title_en || anime.title_es
-            return (
-              <Link key={anime.id} href={`/anime/${anime.slug}`} className="block">
-                <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 mb-2">
-                  <Image
-                    src={anime.poster_url && anime.poster_url.startsWith("http") ? anime.poster_url : "/placeholder-anime.svg"}
-                    alt={title}
-                    className="w-full h-full object-cover"
-                    width={300}
-                    height={450}
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                  <span className="absolute top-2 right-2 text-xs font-bold text-white bg-red-600 px-2 py-1 rounded">
-                    {estadoLabel(estado)}
-                  </span>
-                  {puntuacion && (
-                    <span className="absolute bottom-2 left-2 text-xs font-bold text-yellow-400 bg-black/60 px-2 py-1 rounded">
-                      ⭐ {puntuacion}
-                    </span>
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {items.map(({ anime, estado, puntuacion }) => (
+            <div key={anime.id} className="relative">
+              <div className="absolute right-2 top-2 z-20">
+                <span
+                  className={cn(
+                    "cursor-default rounded-md px-2 py-1 text-xs font-bold text-white shadow-md",
+                    estadoColor(estado)
                   )}
-                </div>
-                <h3 className="text-sm font-medium text-white truncate">
-                  {title}
-                </h3>
-              </Link>
-            )
-          })}
+                >
+                  {estadoLabel(estado)}
+                </span>
+              </div>
+              {puntuacion != null && (
+                <span className="badge-gold absolute left-2 top-2 z-20 rounded-md px-1.5 py-0.5 text-[11px] font-bold backdrop-blur">
+                  ⭐ {puntuacion}
+                </span>
+              )}
+              <AnimeCard anime={anime} lang={lang} />
+              <div className="mt-2 flex gap-1.5">
+                {(["para_ver", "viendo", "visto"] as const).map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => cambiarEstado(anime.id, e)}
+                    disabled={saving.has(anime.id)}
+                    className={cn(
+                      "flex-1 rounded-md py-1 text-[10px] font-semibold uppercase tracking-wide transition disabled:opacity-50",
+                      estado === e
+                        ? "bg-[var(--brand)] text-white"
+                        : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+                    )}
+                  >
+                    {estadoLabel(e)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

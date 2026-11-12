@@ -7,6 +7,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { data: animes } = await supabase
     .from("animes")
     .select("slug, updated_at")
+    .order("created_at", { ascending: false })
+    .limit(10000)
 
   const animeUrls = (animes || []).map((a) => ({
     url: `https://aniline.vercel.app/anime/${a.slug}`,

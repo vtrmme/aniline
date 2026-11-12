@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
 interface HistorialEntry {
   anime_id: string
   episodio_numero: number
+  segundos?: number
 }
 
     const item = anime_id && episodio_numero
@@ -63,6 +64,7 @@ interface HistorialEntry {
       items: data || [],
       inList: !!item,
       episodio_numero: item?.episodio_numero ? String(item.episodio_numero) : null,
+      segundos: typeof item?.segundos === "number" ? item.segundos : 0,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido"
@@ -88,7 +90,12 @@ export async function POST(req: Request) {
       )
     }
 
-    const { anime_id, episodio_numero } = await req.json()
+    const body = (await req.json()) as {
+      anime_id?: string
+      episodio_numero?: number
+      segundos?: number
+    }
+    const { anime_id, episodio_numero } = body
 
     if (!anime_id || !episodio_numero) {
       return NextResponse.json(
@@ -97,6 +104,11 @@ export async function POST(req: Request) {
       )
     }
 
+    const segundos =
+      typeof body.segundos === "number" && Number.isFinite(body.segundos)
+        ? Math.max(0, Math.floor(body.segundos))
+        : 0
+
     const supabase = createServerClient()
 
     const { error } = await supabase.from("historial").upsert(
@@ -104,6 +116,7 @@ export async function POST(req: Request) {
         user_id,
         anime_id,
         episodio_numero,
+        segundos,
         visto_en: new Date().toISOString(),
       },
       { onConflict: "user_id,anime_id,episodio_numero" }

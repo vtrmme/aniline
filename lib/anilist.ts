@@ -134,6 +134,7 @@ export function mapAnilistToAnime(media: AnilistMedia): Omit<Anime, "id"> {
 
   return {
     slug,
+    anilist_id: media.id,
     title_es: titleEs,
     title_en: titleEn,
     sinopsis_es: sinopsisEs,
@@ -170,7 +171,7 @@ export async function fetchPopularAnimes(perPage: number = 24): Promise<AnilistM
 }
 
 export async function searchAnimes(query: string, perPage: number = 20): Promise<AnilistMedia[]> {
-  return fetchAnilistMedia({ perPage, search: query })
+  return fetchAnilistMedia({ perPage }, query)
 }
 
 export async function fetchAnimeById(anilistId: number): Promise<AnilistMedia | null> {

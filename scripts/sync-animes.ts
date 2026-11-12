@@ -77,6 +77,7 @@ async function syncAnimes() {
             genero: animeData.genero,
             anio: animeData.anio,
             estado: animeData.estado,
+            anilist_id: animeData.anilist_id,
           })
           .eq("id", existing.id)
 

@@ -1,13 +1,23 @@
 "use client"
 
 import { createClient } from "@/lib/supabase"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { VideoPlayer } from "@/components/VideoPlayer"
+import { EpisodePlayer, type StreamServerInfo } from "@/components/EpisodePlayer"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import type { Anime, Episode } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
+import type { StreamLang } from "@/lib/streaming"
+
+interface StreamData {
+  servers: StreamServerInfo[]
+  anilistId: number | null
+  nativeUrl: string | null
+  youtubeUrl: string | null
+  hlsUrl: string | null
+}
 
 export default function EpisodePage({
   params,
@@ -22,12 +32,18 @@ export default function EpisodePage({
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [historialItem, setHistorialItem] = useState<{ episodio_numero: number } | null>(null)
+  const [savedSeconds, setSavedSeconds] = useState(0)
   const [nextEpisodeUrl, setNextEpisodeUrl] = useState<string | null>(null)
   const [nextEpisodeNum, setNextEpisodeNum] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [streamData, setStreamData] = useState<StreamData | null>(null)
+  const [streamLang, setStreamLang] = useState<StreamLang>("sub")
 
   const [slug, setSlug] = useState<string | null>(null)
   const [num, setNum] = useState<number | null>(null)
+
+  const animeIdRef = useRef<string | null>(null)
+  const lastProgressRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -70,6 +86,7 @@ export default function EpisodePage({
           return
         }
 
+        animeIdRef.current = animeData.id
         setAnime(animeData as Anime)
         setEpisodeData(epData as Episode)
 
@@ -97,6 +114,7 @@ export default function EpisodePage({
             const json = await res.json()
             if (json.inList) {
               setHistorialItem({ episodio_numero: json.episodio_numero })
+              setSavedSeconds(typeof json.segundos === "number" ? json.segundos : 0)
             }
           }
 
@@ -137,6 +155,70 @@ export default function EpisodePage({
     fetchData()
   }, [slug, num, lang, userId])
 
+  useEffect(() => {
+    if (!slug || num === null) return
+    let cancelled = false
+
+    const fetchServers = async () => {
+      try {
+        const res = await fetch(
+          `/api/stream/servers?slug=${encodeURIComponent(slug)}&episode=${num}&lang=${streamLang}`
+        )
+        if (!res.ok) return
+        const json = (await res.json()) as {
+          ok: boolean
+          servers?: StreamServerInfo[]
+          anilistId?: number | null
+          nativeUrl?: string | null
+          youtubeUrl?: string | null
+          hlsUrl?: string | null
+        }
+        if (cancelled || !json.ok || !Array.isArray(json.servers)) return
+        setStreamData({
+          servers: json.servers,
+          anilistId: typeof json.anilistId === "number" ? json.anilistId : null,
+          nativeUrl: json.nativeUrl || null,
+          youtubeUrl: json.youtubeUrl || null,
+          hlsUrl: json.hlsUrl || null,
+        })
+      } catch {
+        // sin red: se mantiene el reproductor local
+      }
+    }
+
+    fetchServers()
+    return () => {
+      cancelled = true
+    }
+  }, [slug, num, streamLang])
+
+  const saveProgress = useCallback(
+    async (segundos: number) => {
+      if (!userId || !animeIdRef.current || num === null) return
+      const value = Math.max(0, Math.floor(segundos))
+      if (value === lastProgressRef.current) return
+      lastProgressRef.current = value
+      try {
+        await fetch("/api/historial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            anime_id: animeIdRef.current,
+            episodio_numero: num,
+            segundos: value,
+          }),
+        })
+      } catch {
+        // fallo silencioso: el progreso se reintentará
+      }
+    },
+    [userId, num]
+  )
+
+  const handleMarkWatched = useCallback(() => {
+    saveProgress(lastProgressRef.current)
+  }, [saveProgress])
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -163,6 +245,8 @@ export default function EpisodePage({
     lang === "es" ? episodeData.title_es : episodeData.title_en || episodeData.title_es || `Episodio ${episodeData.numero}`
   const sinopsis = lang === "es" ? anime.sinopsis_es : anime.sinopsis_en || anime.sinopsis_es
 
+  const showPlayer = !!streamData || !!videoUrl || !!youtubeUrl
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <nav className="mb-6 flex items-center gap-2 text-sm">
@@ -176,7 +260,7 @@ export default function EpisodePage({
         <span className="text-white">{t(lang, "episodeWatch")} {episodeData.numero}</span>
       </nav>
 
-      {!videoUrl && !youtubeUrl ? (
+      {!showPlayer ? (
         <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl aspect-video w-full flex items-center justify-center">
           <p className="text-gray-400 text-center p-8">
             {t(lang, "episodeNotAvailable") || "Video no disponible aún"}
@@ -197,7 +281,35 @@ export default function EpisodePage({
               </Link>
             </div>
           )}
-          <VideoPlayer videoUrl={videoUrl} youtubeUrl={youtubeUrl} />
+
+          {streamData && streamData.servers.length > 0 ? (
+            <EpisodePlayer
+              key={`${anime.slug}:${episodeData.numero}`}
+              servers={streamData.servers}
+              anilistId={streamData.anilistId}
+              episode={episodeData.numero}
+              lang={streamLang}
+              onLangChange={setStreamLang}
+              nativeUrl={streamData.nativeUrl || videoUrl}
+              youtubeUrl={streamData.youtubeUrl || youtubeUrl}
+              hlsUrl={streamData.hlsUrl}
+              storageKey={`${anime.slug}:${episodeData.numero}`}
+              initialSeconds={savedSeconds}
+              onProgress={saveProgress}
+              onMarkWatched={handleMarkWatched}
+              labels={{
+                markWatched: t(lang, "serverMarkWatched"),
+                sub: t(lang, "serverSub"),
+                dub: t(lang, "serverDub"),
+                notAvailable: t(lang, "episodeNotAvailable"),
+                invalidYoutube: "URL de YouTube inválida",
+                noServers: t(lang, "serverNoServers"),
+              }}
+            />
+          ) : (
+            <VideoPlayer videoUrl={videoUrl} youtubeUrl={youtubeUrl} />
+          )}
+
           {nextEpisodeUrl || nextEpisodeNum && (
             <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-xl p-4">
               <p className="text-xs text-gray-400 mb-2 uppercase tracking-wider">Siguiente episodio</p>

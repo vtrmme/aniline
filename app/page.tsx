@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase"
 import { AnimeCard } from "@/components/AnimeCard"
+import { LatestEpisodes } from "@/components/LatestEpisodes"
 import { cn } from "@/lib/utils"
 import { useEffect, useState, useCallback, useMemo } from "react"
 import type { Anime } from "@/types"
@@ -112,6 +113,8 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <LatestEpisodes />
+
       <div className="mb-8 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white">{t(lang, "homePopulares")}</h1>

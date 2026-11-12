@@ -1,6 +1,7 @@
 export interface Anime {
   id: string
   slug: string
+  anilist_id?: number | null
   title_es: string
   title_en?: string
   sinopsis_es?: string
@@ -50,6 +51,7 @@ export interface HistorialItem {
   user_id: string
   anime_id: string
   episodio_numero: number
+  segundos?: number
   visto_en: string
   animes?: Anime
 }

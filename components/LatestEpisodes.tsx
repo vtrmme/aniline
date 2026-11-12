@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
 
+const LIMIT = 12
+const FETCH_LIMIT = 200
+
 interface LatestEpisodeAnime {
   slug: string
   title_es: string
@@ -14,11 +17,10 @@ interface LatestEpisodeAnime {
 }
 
 interface LatestEpisode {
+  id: string
   numero: number
   animes: LatestEpisodeAnime | null
 }
-
-const LIMIT = 12
 
 export function LatestEpisodes() {
   const { lang } = useLanguage()
@@ -32,12 +34,25 @@ export function LatestEpisodes() {
         const supabase = createClient()
         const { data } = await supabase
           .from("episodes")
-          .select("numero, animes(slug, title_es, title_en, poster_url)")
+          .select("id, numero, anime_id, animes(slug, title_es, title_en, poster_url)")
           .order("created_at", { ascending: false })
-          .limit(LIMIT)
+          .order("numero", { ascending: false })
+          .limit(FETCH_LIMIT)
 
         if (cancelled) return
-        setEpisodes((data || []) as unknown as LatestEpisode[])
+
+        // Un solo episodio por anime para que un backfill no inunde la sección
+        const vistos = new Set<string>()
+        const unicos: LatestEpisode[] = []
+        for (const ep of (data || []) as unknown as LatestEpisode[]) {
+          if (!ep.animes) continue
+          const clave = ep.animes.slug
+          if (vistos.has(clave)) continue
+          vistos.add(clave)
+          unicos.push(ep)
+          if (unicos.length >= LIMIT) break
+        }
+        setEpisodes(unicos)
       } catch (err) {
         console.error("Error cargando últimos episodios:", err)
       } finally {

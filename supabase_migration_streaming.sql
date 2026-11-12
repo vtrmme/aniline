@@ -37,6 +37,18 @@ DROP POLICY IF EXISTS "historial_owner_all" ON historial;
 CREATE POLICY "historial_owner_all" ON historial
 FOR ALL USING (user_id = auth.uid()::text);
 
+-- 5b. Restricción única de episodios (evita duplicados anime+número)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'episodes_anime_id_numero_key'
+      AND conrelid = 'episodes'::regclass
+  ) THEN
+    ALTER TABLE episodes ADD CONSTRAINT episodes_anime_id_numero_key UNIQUE (anime_id, numero);
+  END IF;
+END $$;
+
 -- 6. Asegurar columnas que ya usa el código pero no estaban en supabase_setup.sql
 ALTER TABLE animes ADD COLUMN IF NOT EXISTS tipo TEXT;
 ALTER TABLE animes ADD COLUMN IF NOT EXISTS estudio TEXT;

@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/supabase"
-import { searchAnimes, mapAnilistToAnime } from "@/lib/anilist"
+import { searchAnimes, mapAnilistToAnime, computeTotalEpisodes } from "@/lib/anilist"
 import * as fs from "fs"
 import * as path from "path"
 
@@ -109,7 +109,12 @@ async function syncAnimes() {
       }
 
       // Crear/actualizar episodios (1 a N) con video_url vacío
-      const totalEpisodes = media.episodes || 12
+      const { count: existingCount } = await supabase
+        .from("episodes")
+        .select("*", { count: "exact", head: true })
+        .eq("anime_id", animeId)
+
+      const totalEpisodes = computeTotalEpisodes(media, existingCount ?? 0)
       const episodesToInsert: EpisodeInsert[] = []
 
       for (let i = 1; i <= totalEpisodes; i++) {
@@ -124,19 +129,32 @@ async function syncAnimes() {
       }
 
       if (episodesToInsert.length > 0) {
-        // Eliminar episodios existentes para evitar duplicados
-        await supabase.from("episodes").delete().eq("anime_id", animeId)
-
-        const { error: epError } = await supabase
+        // Añade solo los que falten: no borra video_url ni episodios subidos
+        const { data: epsActuales } = await supabase
           .from("episodes")
-          .insert(episodesToInsert)
+          .select("numero")
+          .eq("anime_id", animeId)
 
-        if (epError) {
-          console.error(`Error creando episodios para ${animeData.slug}:`, epError.message)
-        } else {
-          console.log(`  Creados ${episodesToInsert.length} episodios`)
+        const existentes = new Set<number>(
+          (epsActuales || []).map((e: { numero: number }) => e.numero)
+        )
+        const faltantes = episodesToInsert.filter((e) => !existentes.has(e.numero))
+
+        for (let i = 0; i < faltantes.length; i += 500) {
+          const lote = faltantes.slice(i, i + 500)
+          const { error: epError } = await supabase.from("episodes").insert(lote)
+
+          if (epError) {
+            console.error(`Error creando episodios para ${animeData.slug}:`, epError.message)
+          }
         }
+        console.log(`  Episodios: ${existentes.size} existentes → ${totalEpisodes} totales`)
       }
+
+      await supabase
+        .from("animes")
+        .update({ episodios_count: totalEpisodes })
+        .eq("id", animeId)
     } catch (err) {
       console.error(`Error procesando anime:`, err)
       errors++

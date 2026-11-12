@@ -19,6 +19,7 @@ interface AnilistMedia {
   format?: string
   status?: string
   episodes?: number
+  nextAiringEpisode?: { episode?: number; airingAt?: number } | null
   duration?: number
   chapters?: number
   volumes?: number
@@ -71,6 +72,7 @@ export async function fetchAnilistMedia(
           format
           status
           episodes
+          nextAiringEpisode { episode airingAt }
           duration
           genres
           tags { name }
@@ -170,6 +172,18 @@ export async function fetchPopularAnimes(perPage: number = 24): Promise<AnilistM
   return fetchAnilistMedia({ perPage })
 }
 
+export function computeTotalEpisodes(
+  media: Pick<AnilistMedia, "episodes" | "nextAiringEpisode">,
+  existingCount: number = 0
+): number {
+  const declarado = typeof media.episodes === "number" && media.episodes > 0 ? media.episodes : 0
+  const alAire = media.nextAiringEpisode?.episode
+  const emitidos = typeof alAire === "number" && alAire > 1 ? alAire - 1 : 0
+
+  const total = Math.max(declarado, emitidos, existingCount)
+  return total > 0 ? total : 12
+}
+
 export async function searchAnimes(query: string, perPage: number = 20): Promise<AnilistMedia[]> {
   return fetchAnilistMedia({ perPage }, query)
 }
@@ -184,7 +198,9 @@ export async function fetchAnimeById(anilistId: number): Promise<AnilistMedia | 
         startDate { year month day }
         endDate { year month day }
         season seasonYear
-        type format status episodes duration
+        type format status episodes
+        nextAiringEpisode { episode airingAt }
+        duration
         genres tags { name }
         synonyms averageScore popularity
         coverImage { large medium color }

@@ -2,6 +2,15 @@ import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import { buildServers, type StreamLang, type StreamServer } from "@/lib/streaming"
+import {
+  obtenerIP,
+  usuarioAutenticado,
+  esSlugSeguro,
+  esEnteroEnRango,
+  respuestaLimite,
+  noAutorizado,
+  errorInterno,
+} from "@/lib/security"
 
 const BUCKET = "episode-videos"
 
@@ -9,15 +18,6 @@ interface ServerDescriptor {
   id: string
   name: string
   kind: StreamServer["kind"]
-}
-
-function obtenerIP(req: Request): string {
-  const headers = req.headers as unknown as Record<string, string>
-  return (
-    headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    headers["x-real-ip"] ||
-    "desconocido"
-  )
 }
 
 function parseLang(value: string | null): StreamLang {
@@ -54,13 +54,15 @@ async function resolveHls(
 }
 
 export async function GET(req: Request) {
+  const user_id = await usuarioAutenticado(req)
+  if (!user_id) {
+    return noAutorizado()
+  }
+
   const ip = obtenerIP(req)
   const limite = rateLimit({ clave: `stream:${ip}`, maximo: 60, ventanaSegundos: 60 })
   if (!limite.permitido) {
-    return NextResponse.json(
-      { ok: false, error: "Demasiadas solicitudes. Intenta de nuevo más tarde." },
-      { status: 429 }
-    )
+    return respuestaLimite()
   }
 
   try {
@@ -76,13 +78,20 @@ export async function GET(req: Request) {
       )
     }
 
-    const numero = Number(episodeParam)
-    if (!Number.isInteger(numero) || numero < 1) {
+    if (!esSlugSeguro(slug)) {
+      return NextResponse.json(
+        { ok: false, error: "slug inválido" },
+        { status: 400 }
+      )
+    }
+
+    if (!esEnteroEnRango(Number(episodeParam), 1, 100000)) {
       return NextResponse.json(
         { ok: false, error: "Número de episodio inválido" },
         { status: 400 }
       )
     }
+    const numero = Number(episodeParam)
 
     const supabase = createServerClient()
 
@@ -161,8 +170,7 @@ export async function GET(req: Request) {
       hlsUrl,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }
 

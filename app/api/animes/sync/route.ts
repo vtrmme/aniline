@@ -1,24 +1,17 @@
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import { syncCatalog } from "@/lib/catalog"
-
-function obtenerIP(req: Request): string {
-  const headers = req.headers as unknown as Record<string, string>
-  return (
-    headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    headers["x-real-ip"] ||
-    "desconocido"
-  )
-}
+import { obtenerIP, verificarBearerAdmin, respuestaLimite, errorInterno } from "@/lib/security"
 
 export async function POST(req: Request) {
+  if (!verificarBearerAdmin(req)) {
+    return NextResponse.json({ ok: false, error: "No autorizado." }, { status: 401 })
+  }
+
   const ip = obtenerIP(req)
   const limite = rateLimit({ clave: `sync:${ip}`, maximo: 2, ventanaSegundos: 3600 })
   if (!limite.permitido) {
-    return NextResponse.json(
-      { ok: false, error: "Sincronización limitada. Intenta de nuevo más tarde." },
-      { status: 429 }
-    )
+    return respuestaLimite()
   }
 
   try {
@@ -41,18 +34,13 @@ export async function POST(req: Request) {
       ...result,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 500 }
-    )
+    return errorInterno(err)
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    message:
-      "Endpoint de sincronización. Usa POST con ?meta=N para sincronizar hasta N animes.",
-  })
+  return NextResponse.json(
+    { ok: false, error: "Método no permitido." },
+    { status: 405 }
+  )
 }

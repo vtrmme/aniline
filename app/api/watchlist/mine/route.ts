@@ -2,6 +2,8 @@ import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import { NextRequest } from "next/server"
+import { rateLimit } from "@/lib/rate-limit"
+import { obtenerIP, respuestaLimite, errorInterno } from "@/lib/security"
 
 async function getUserId(req: NextRequest): Promise<string | null> {
   const token = await getToken({
@@ -18,6 +20,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, items: [] })
     }
 
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `watchlist-mine:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
+    }
+
     const supabase = createServerClient()
 
     const { data, error } = await supabase
@@ -27,8 +35,9 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
 
     if (error) {
+      console.error("Watchlist mine error:", error.message)
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: "No se pudo cargar tu lista." },
         { status: 500 }
       )
     }
@@ -38,7 +47,6 @@ export async function GET(req: NextRequest) {
       items: data || [],
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }

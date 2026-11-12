@@ -1,6 +1,16 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse, NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
+import { rateLimit } from "@/lib/rate-limit"
+import {
+  obtenerIP,
+  esUUID,
+  esEstadoWatchlist,
+  verificarOrigen,
+  cuerpoDentroDelLimite,
+  respuestaLimite,
+  errorInterno,
+} from "@/lib/security"
 
 async function getUserId(req: Request): Promise<string | null> {
   const nextReq = new NextRequest(req.url, {
@@ -13,10 +23,21 @@ async function getUserId(req: Request): Promise<string | null> {
   return token?.sub || null
 }
 
+interface CuerpoWatchlist {
+  anime_id?: unknown
+  estado?: unknown
+}
+
 export async function POST(req: Request) {
   try {
+    if (!verificarOrigen(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Origen no permitido." },
+        { status: 403 }
+      )
+    }
+
     const user_id = await getUserId(req)
-    console.log("Watchlist POST: user_id=", user_id)
     if (!user_id) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
@@ -24,8 +45,21 @@ export async function POST(req: Request) {
       )
     }
 
-    const { anime_id, estado } = await req.json()
-    console.log("Watchlist POST: anime_id=", anime_id, "estado=", estado)
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `watchlist:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
+    }
+
+    if (!cuerpoDentroDelLimite(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Cuerpo de la solicitud demasiado grande." },
+        { status: 413 }
+      )
+    }
+
+    const body = (await req.json()) as CuerpoWatchlist
+    const { anime_id, estado } = body
 
     if (!anime_id || !estado) {
       return NextResponse.json(
@@ -34,8 +68,21 @@ export async function POST(req: Request) {
       )
     }
 
+    if (!esUUID(anime_id)) {
+      return NextResponse.json(
+        { ok: false, error: "anime_id inválido." },
+        { status: 400 }
+      )
+    }
+
+    if (!esEstadoWatchlist(estado)) {
+      return NextResponse.json(
+        { ok: false, error: "estado inválido. Valores permitidos: para_ver, viendo, visto." },
+        { status: 400 }
+      )
+    }
+
     const supabase = createServerClient()
-    console.log("Watchlist POST: supabase client created")
 
     const { data: existing, error: selectError } = await supabase
       .from("watchlists")
@@ -44,12 +91,10 @@ export async function POST(req: Request) {
       .eq("anime_id", anime_id)
       .single()
 
-    console.log("Watchlist POST: select done, existing=", existing, "selectError=", selectError)
-
     if (selectError && selectError.code !== "PGRST116") {
-      console.error("Watchlist POST select error:", selectError)
+      console.error("Watchlist select error:", selectError.message)
       return NextResponse.json(
-        { ok: false, error: selectError.message },
+        { ok: false, error: "No se pudo consultar la lista." },
         { status: 500 }
       )
     }
@@ -61,9 +106,9 @@ export async function POST(req: Request) {
         .eq("id", existing.id)
 
       if (error) {
-        console.error("Watchlist POST update error:", error)
+        console.error("Watchlist update error:", error.message)
         return NextResponse.json(
-          { ok: false, error: error.message },
+          { ok: false, error: "No se pudo actualizar la lista." },
           { status: 500 }
         )
       }
@@ -71,32 +116,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, action: "updated", estado })
     }
 
-    const { error } = await supabase
-      .from("watchlists")
-      .insert({
-        user_id,
-        anime_id,
-        estado,
-      })
+    const { error } = await supabase.from("watchlists").insert({
+      user_id,
+      anime_id,
+      estado,
+    })
 
     if (error) {
-      console.error("Watchlist POST insert error:", error)
+      console.error("Watchlist insert error:", error.message)
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: "No se pudo añadir a la lista." },
         { status: 500 }
       )
     }
 
     return NextResponse.json({ ok: true, action: "created", estado })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    console.error("Watchlist POST catch error:", err)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }
 
 export async function DELETE(req: Request) {
   try {
+    if (!verificarOrigen(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Origen no permitido." },
+        { status: 403 }
+      )
+    }
+
     const user_id = await getUserId(req)
     if (!user_id) {
       return NextResponse.json(
@@ -105,12 +153,25 @@ export async function DELETE(req: Request) {
       )
     }
 
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `watchlist:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
+    }
+
     const { searchParams } = new URL(req.url)
     const anime_id = searchParams.get("anime_id")
 
     if (!anime_id) {
       return NextResponse.json(
         { ok: false, error: "anime_id requerido" },
+        { status: 400 }
+      )
+    }
+
+    if (!esUUID(anime_id)) {
+      return NextResponse.json(
+        { ok: false, error: "anime_id inválido." },
         { status: 400 }
       )
     }
@@ -124,17 +185,16 @@ export async function DELETE(req: Request) {
       .eq("anime_id", anime_id)
 
     if (error) {
+      console.error("Watchlist delete error:", error.message)
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: "No se pudo eliminar de la lista." },
         { status: 500 }
       )
     }
 
     return NextResponse.json({ ok: true, action: "deleted" })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    console.error("Watchlist DELETE error:", err)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }
 
@@ -145,12 +205,25 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, inList: false })
     }
 
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `watchlist:${ip}`, maximo: 120, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
+    }
+
     const { searchParams } = new URL(req.url)
     const anime_id = searchParams.get("anime_id")
 
     if (!anime_id) {
       return NextResponse.json(
         { ok: false, error: "anime_id requerido" },
+        { status: 400 }
+      )
+    }
+
+    if (!esUUID(anime_id)) {
+      return NextResponse.json(
+        { ok: false, error: "anime_id inválido." },
         { status: 400 }
       )
     }
@@ -170,8 +243,6 @@ export async function GET(req: Request) {
       estado: data?.estado || null,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    console.error("Watchlist GET error:", err)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }

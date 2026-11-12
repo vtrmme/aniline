@@ -1,9 +1,29 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
+import { rateLimit } from "@/lib/rate-limit"
+import {
+  obtenerIP,
+  usuarioAutenticado,
+  esPathVideoSeguro,
+  respuestaLimite,
+  noAutorizado,
+  errorInterno,
+} from "@/lib/security"
 
 const BUCKET = "episode-videos"
 
 export async function GET(req: Request) {
+  const user_id = await usuarioAutenticado(req)
+  if (!user_id) {
+    return noAutorizado()
+  }
+
+  const ip = obtenerIP(req)
+  const limite = rateLimit({ clave: `play:${ip}`, maximo: 30, ventanaSegundos: 60 })
+  if (!limite.permitido) {
+    return respuestaLimite()
+  }
+
   try {
     const { searchParams } = new URL(req.url)
     const filePath = searchParams.get("path")
@@ -15,6 +35,13 @@ export async function GET(req: Request) {
       )
     }
 
+    if (!esPathVideoSeguro(filePath)) {
+      return NextResponse.json(
+        { ok: false, error: "Ruta de archivo inválida." },
+        { status: 400 }
+      )
+    }
+
     const supabase = createServerClient()
 
     const { data, error } = await supabase.storage
@@ -22,8 +49,9 @@ export async function GET(req: Request) {
       .createSignedUrl(filePath, 3600)
 
     if (error) {
+      console.error("Error creando URL de reproducción:", error.message)
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: "No se pudo obtener el video." },
         { status: 500 }
       )
     }
@@ -34,7 +62,6 @@ export async function GET(req: Request) {
       path: filePath,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }

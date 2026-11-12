@@ -2,6 +2,8 @@ import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import { NextRequest } from "next/server"
+import { rateLimit } from "@/lib/rate-limit"
+import { obtenerIP, respuestaLimite, errorInterno } from "@/lib/security"
 
 interface WatchlistConAnime {
   estado: string
@@ -21,6 +23,12 @@ export async function GET(req: NextRequest) {
     const user_id = await getUserId(req)
     if (!user_id) {
       return NextResponse.json({ ok: true, stats: null })
+    }
+
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `stats:${ip}`, maximo: 30, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
     }
 
     const supabase = createServerClient()
@@ -61,7 +69,6 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }

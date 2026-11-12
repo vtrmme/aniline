@@ -6,13 +6,21 @@ interface RateLimitEntry {
 const store = new Map<string, RateLimitEntry>()
 
 const LIMPIEZA_INTERVALO_MS = 60_000
+const MAX_ENTRADAS = 50_000
 
-setInterval(() => {
+function limpiarExpiradas(): void {
   const ahora = Date.now()
   for (const [key, entry] of store.entries()) {
     if (ahora > entry.resetTime) {
       store.delete(key)
     }
+  }
+}
+
+setInterval(() => {
+  limpiarExpiradas()
+  if (store.size > MAX_ENTRADAS) {
+    store.clear()
   }
 }, LIMPIEZA_INTERVALO_MS)
 

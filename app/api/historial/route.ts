@@ -2,6 +2,16 @@ import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import { NextRequest } from "next/server"
+import { rateLimit } from "@/lib/rate-limit"
+import {
+  obtenerIP,
+  esUUID,
+  esEnteroEnRango,
+  verificarOrigen,
+  cuerpoDentroDelLimite,
+  respuestaLimite,
+  errorInterno,
+} from "@/lib/security"
 
 async function getUserId(req: NextRequest): Promise<string | null> {
   const token = await getToken({
@@ -11,6 +21,12 @@ async function getUserId(req: NextRequest): Promise<string | null> {
   return token?.sub || null
 }
 
+interface HistorialEntry {
+  anime_id: string
+  episodio_numero: number
+  segundos?: number
+}
+
 export async function GET(req: NextRequest) {
   try {
     const user_id = await getUserId(req)
@@ -18,9 +34,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, items: [] })
     }
 
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `historial:${ip}`, maximo: 120, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
+    }
+
     const { searchParams } = new URL(req.url)
     const anime_id = searchParams.get("anime_id")
     const episodio_numero = searchParams.get("episodio_numero")
+
+    if (anime_id && !esUUID(anime_id)) {
+      return NextResponse.json(
+        { ok: false, error: "anime_id inválido." },
+        { status: 400 }
+      )
+    }
 
     const supabase = createServerClient()
 
@@ -34,30 +63,33 @@ export async function GET(req: NextRequest) {
       query = query.eq("anime_id", anime_id)
     }
     if (episodio_numero) {
-      query = query.eq("episodio_numero", Number(episodio_numero))
+      const numero = Number(episodio_numero)
+      if (!Number.isInteger(numero) || numero < 1 || numero > 100000) {
+        return NextResponse.json(
+          { ok: false, error: "episodio_numero inválido." },
+          { status: 400 }
+        )
+      }
+      query = query.eq("episodio_numero", numero)
     }
 
     const { data, error } = await query
 
     if (error) {
+      console.error("Error consultando historial:", error.message)
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: "No se pudo consultar el historial." },
         { status: 500 }
       )
     }
 
-interface HistorialEntry {
-  anime_id: string
-  episodio_numero: number
-  segundos?: number
-}
-
-    const item = anime_id && episodio_numero
-      ? (data || []).find(
-          (h: HistorialEntry) =>
-            h.anime_id === anime_id && h.episodio_numero === Number(episodio_numero)
-        )
-      : null
+    const item =
+      anime_id && episodio_numero
+        ? (data || []).find(
+            (h: HistorialEntry) =>
+              h.anime_id === anime_id && h.episodio_numero === Number(episodio_numero)
+          )
+        : null
 
     return NextResponse.json({
       ok: true,
@@ -67,13 +99,25 @@ interface HistorialEntry {
       segundos: typeof item?.segundos === "number" ? item.segundos : 0,
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
+}
+
+interface CuerpoHistorial {
+  anime_id?: unknown
+  episodio_numero?: unknown
+  segundos?: unknown
 }
 
 export async function POST(req: Request) {
   try {
+    if (!verificarOrigen(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Origen no permitido." },
+        { status: 403 }
+      )
+    }
+
     const nextReq = new NextRequest(req.url, {
       headers: req.headers,
     })
@@ -82,7 +126,6 @@ export async function POST(req: Request) {
       secret: process.env.NEXTAUTH_SECRET,
     })
     const user_id = token?.sub || null
-
     if (!user_id) {
       return NextResponse.json(
         { ok: false, error: "No autenticado" },
@@ -90,12 +133,21 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = (await req.json()) as {
-      anime_id?: string
-      episodio_numero?: number
-      segundos?: number
+    const ip = obtenerIP(req)
+    const limite = rateLimit({ clave: `historial-post:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    if (!limite.permitido) {
+      return respuestaLimite()
     }
-    const { anime_id, episodio_numero } = body
+
+    if (!cuerpoDentroDelLimite(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Cuerpo de la solicitud demasiado grande." },
+        { status: 413 }
+      )
+    }
+
+    const body = (await req.json()) as CuerpoHistorial
+    const { anime_id, episodio_numero, segundos } = body
 
     if (!anime_id || !episodio_numero) {
       return NextResponse.json(
@@ -104,9 +156,23 @@ export async function POST(req: Request) {
       )
     }
 
-    const segundos =
-      typeof body.segundos === "number" && Number.isFinite(body.segundos)
-        ? Math.max(0, Math.floor(body.segundos))
+    if (!esUUID(anime_id)) {
+      return NextResponse.json(
+        { ok: false, error: "anime_id inválido." },
+        { status: 400 }
+      )
+    }
+
+    if (!esEnteroEnRango(episodio_numero, 1, 100000)) {
+      return NextResponse.json(
+        { ok: false, error: "episodio_numero inválido." },
+        { status: 400 }
+      )
+    }
+
+    const segundosLimpios =
+      typeof segundos === "number" && Number.isFinite(segundos)
+        ? Math.min(86400, Math.max(0, Math.floor(segundos)))
         : 0
 
     const supabase = createServerClient()
@@ -116,22 +182,22 @@ export async function POST(req: Request) {
         user_id,
         anime_id,
         episodio_numero,
-        segundos,
+        segundos: segundosLimpios,
         visto_en: new Date().toISOString(),
       },
       { onConflict: "user_id,anime_id,episodio_numero" }
     )
 
     if (error) {
+      console.error("Error guardando historial:", error.message)
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: "No se pudo guardar el historial." },
         { status: 500 }
       )
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }

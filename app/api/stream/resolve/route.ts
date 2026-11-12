@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import type { StreamLang } from "@/lib/streaming"
-
-function obtenerIP(req: Request): string {
-  const headers = req.headers as unknown as Record<string, string>
-  return (
-    headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    headers["x-real-ip"] ||
-    "desconocido"
-  )
-}
+import {
+  obtenerIP,
+  usuarioAutenticado,
+  respuestaLimite,
+  noAutorizado,
+  errorInterno,
+} from "@/lib/security"
 
 function parseLang(value: string | null): StreamLang {
   return value === "dub" ? "dub" : "sub"
@@ -22,13 +20,15 @@ interface ResolverResponse {
 }
 
 export async function GET(req: Request) {
+  const user_id = await usuarioAutenticado(req)
+  if (!user_id) {
+    return noAutorizado()
+  }
+
   const ip = obtenerIP(req)
   const limite = rateLimit({ clave: `resolve:${ip}`, maximo: 30, ventanaSegundos: 60 })
   if (!limite.permitido) {
-    return NextResponse.json(
-      { ok: false, error: "Demasiadas solicitudes. Intenta de nuevo más tarde." },
-      { status: 429 }
-    )
+    return respuestaLimite()
   }
 
   try {
@@ -47,13 +47,13 @@ export async function GET(req: Request) {
     const anilistId = Number(anilistIdParam)
     const episode = Number(episodeParam)
 
-    if (!Number.isInteger(anilistId) || anilistId < 1) {
+    if (!Number.isInteger(anilistId) || anilistId < 1 || anilistId > 2147483647) {
       return NextResponse.json(
         { ok: false, error: "anilistId inválido" },
         { status: 400 }
       )
     }
-    if (!Number.isInteger(episode) || episode < 1) {
+    if (!Number.isInteger(episode) || episode < 1 || episode > 100000) {
       return NextResponse.json(
         { ok: false, error: "Número de episodio inválido" },
         { status: 400 }
@@ -69,7 +69,16 @@ export async function GET(req: Request) {
       })
     }
 
-    const url = new URL("/watch", baseUrl.trim())
+    let url: URL
+    try {
+      url = new URL("/watch", baseUrl.trim())
+    } catch {
+      return NextResponse.json({
+        ok: true,
+        url: null,
+        error: "El resolutor de streams no está configurado en el servidor.",
+      })
+    }
     url.searchParams.set("anilistId", String(anilistId))
     url.searchParams.set("episode", String(episode))
     url.searchParams.set("lang", lang)
@@ -89,7 +98,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, url: resolved })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido"
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return errorInterno(err)
   }
 }

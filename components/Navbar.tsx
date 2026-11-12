@@ -12,6 +12,7 @@ import {
   Moon,
   Sun,
   Search,
+  Heart,
 } from "lucide-react"
 import { Suspense } from "react"
 import { cn } from "@/lib/utils"
@@ -24,6 +25,8 @@ interface EnlaceNav {
   label: string
   activo: boolean
 }
+
+const PATREON_URL = "https://www.patreon.com/AniLine"
 
 function construirEnlaces(
   pathname: string,
@@ -244,6 +247,15 @@ export function Navbar() {
               )}
             </form>
 
+            <a
+              href={PATREON_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden items-center gap-1.5 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--brand-bright)] md:inline-flex"
+            >
+              <Heart size={15} fill="currentColor" />
+              {t(lang, "navSupport")}
+            </a>
             <button
               onClick={toggleTheme}
               className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white"
@@ -293,6 +305,17 @@ export function Navbar() {
                 className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
               />
             </form>
+
+            <a
+              href={PATREON_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="mb-1 flex items-center justify-center gap-2 rounded-lg bg-[var(--brand)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-bright)]"
+            >
+              <Heart size={16} fill="currentColor" />
+              {t(lang, "navSupport")}
+            </a>
 
             <Suspense fallback={null}>
               <EnlacesNav cerrarMenu={() => setOpen(false)} variante="movil" />

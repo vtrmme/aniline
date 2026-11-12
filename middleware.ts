@@ -36,10 +36,10 @@ function ipDe(req: NextRequest): string {
   return req.headers.get("x-real-ip") || "desconocido"
 }
 
-function construirCsp(nonce: string): string {
+function construirCsp(): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
@@ -79,14 +79,9 @@ function capaSeguridad(req: NextRequest): NextResponse | null {
     )
   }
 
-  const nonce = crypto.randomUUID()
-  const csp = construirCsp(nonce)
+  const csp = construirCsp()
 
-  const requestHeaders = new Headers(req.headers)
-  requestHeaders.set("x-nonce", nonce)
-  requestHeaders.set("content-security-policy", csp)
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  const response = NextResponse.next()
   response.headers.set("Content-Security-Policy", csp)
   response.headers.set("X-Content-Type-Options", "nosniff")
   response.headers.set("X-Frame-Options", "DENY")

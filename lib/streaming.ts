@@ -30,22 +30,10 @@ const EMBED_PROVIDERS: EmbedProvider[] = [
       `https://megaplay.buzz/stream/ani/${anilistId}/${episode}/${lang}`,
   },
   {
-    id: "vidplus",
-    name: "VidPlus",
-    getEmbedUrl: (anilistId, episode, lang) =>
-      `https://player.vidplus.to/embed/anime/${anilistId}/${episode}?dub=${lang === "dub"}`,
-  },
-  {
     id: "vidhawk",
     name: "VidHawk",
     getEmbedUrl: (anilistId, episode, lang) =>
       `https://vidhawk.buzz/embed/ani/${anilistId}/${episode}/${lang}`,
-  },
-  {
-    id: "moviepire",
-    name: "Moviepire",
-    getEmbedUrl: (anilistId, episode) =>
-      `https://video.moviepire.co/stream/anime/${anilistId}/${episode}`,
   },
 ]
 

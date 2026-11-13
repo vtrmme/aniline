@@ -106,7 +106,7 @@ Opcionales:
 
 ```
 STREAM_RESOLVER_URL=                # Agregador HLS propio; si se define aparece la pestaña "HD"
-NEXT_PUBLIC_STREAM_PROVIDERS=       # Limitar providers embed, ej: megaplay,vidplus
+NEXT_PUBLIC_STREAM_PROVIDERS=       # Limitar providers embed, ej: megaplay,vidhawk
 ```
 
 ### En Vercel (Settings → Environment Variables)

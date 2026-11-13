@@ -125,7 +125,7 @@ export async function GET(req: Request) {
     const rawAnilistId =
       typeof anime.anilist_id === "number" && Number.isInteger(anime.anilist_id)
         ? anime.anilist_id
-        : parseAnilistIdFromSlug(anime.slug)
+        : null
 
     const hasNativeVideo = !!episode.video_url
     const hasYoutube = !!episode.youtube_url
@@ -172,11 +172,4 @@ export async function GET(req: Request) {
   } catch (err) {
     return errorInterno(err)
   }
-}
-
-function parseAnilistIdFromSlug(slug: string): number | null {
-  const match = /^(\d+)-/.exec(slug)
-  if (!match) return null
-  const value = Number(match[1])
-  return Number.isInteger(value) ? value : null
 }

@@ -46,7 +46,7 @@ function construirCsp(): string {
     "connect-src 'self' https://graphql.anilist.co https://*.supabase.co",
     "media-src 'self' blob: https:",
     "worker-src 'self' blob:",
-    "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
+    "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://megaplay.buzz https://vidhawk.buzz",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -56,6 +56,28 @@ function construirCsp(): string {
 }
 
 function capaSeguridad(req: NextRequest): NextResponse | null {
+  const response = NextResponse.next()
+  response.headers.set("Content-Security-Policy", construirCsp())
+  response.headers.set("X-Content-Type-Options", "nosniff")
+  response.headers.set("X-Frame-Options", "DENY")
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=()"
+  )
+  response.headers.set(
+    "Strict-Transport-Security",
+    "max-age=63072000; includeSubDomains; preload"
+  )
+  response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
+
+  const esRecursoEstatico = /\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|txt|xml|json|js|mjs|css|map)$/i.test(
+    req.nextUrl.pathname
+  )
+  if (esRecursoEstatico) {
+    return response
+  }
+
   const userAgent = req.headers.get("user-agent")
   if (!userAgent || !userAgent.trim()) {
     return new NextResponse(null, { status: 403 })
@@ -79,21 +101,6 @@ function capaSeguridad(req: NextRequest): NextResponse | null {
     )
   }
 
-  const csp = construirCsp()
-
-  const response = NextResponse.next()
-  response.headers.set("Content-Security-Policy", csp)
-  response.headers.set("X-Content-Type-Options", "nosniff")
-  response.headers.set("X-Frame-Options", "DENY")
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=()"
-  )
-  response.headers.set(
-    "Strict-Transport-Security",
-    "max-age=63072000; includeSubDomains; preload"
-  )
   return response
 }
 

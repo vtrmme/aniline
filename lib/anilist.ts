@@ -2,8 +2,11 @@ import type { Anime } from "@/types"
 
 const ANILIST_API_URL = "https://graphql.anilist.co"
 
+export type FuenteMedia = "anilist" | "tenrai" | "kitsu"
+
 export interface AnilistMedia {
   id: number
+  fuente?: FuenteMedia
   idMal?: number | null
   title: {
     romaji?: string
@@ -144,9 +147,7 @@ ${MEDIA_FIELDS}
     page: variables.page || 1,
     perPage: variables.perPage || 50,
     type: "ANIME",
-    sort: hayBusqueda
-      ? ["RELEVANCE"]
-      : (variables.sort as string[] | undefined) || ["POPULARITY_DESC"],
+    sort: hayBusqueda ? null : (variables.sort as string[] | undefined) || ["POPULARITY_DESC"],
   }
 
   if (hayBusqueda) {
@@ -198,6 +199,7 @@ export function mapAnilistToAnime(media: AnilistMedia): Omit<Anime, "id"> {
   const sinopsisEn = media.description ? stripHtml(media.description) : undefined
   const sinopsisEs = sinopsisEn
 
+  const esFuenteAlternativa = media.fuente === "tenrai" || media.fuente === "kitsu"
   const slug = generateSlug(titleEs, media.id)
   const puntuacion =
     typeof media.averageScore === "number" && media.averageScore > 0
@@ -212,7 +214,7 @@ export function mapAnilistToAnime(media: AnilistMedia): Omit<Anime, "id"> {
 
   return {
     slug,
-    anilist_id: media.id,
+    anilist_id: esFuenteAlternativa ? null : media.id,
     mal_id: typeof media.idMal === "number" ? media.idMal : null,
     title_es: titleEs,
     title_en: titleEn,

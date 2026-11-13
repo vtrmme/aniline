@@ -176,7 +176,7 @@ function HomeContent() {
 
         <AnimeRow
           title={t(lang, "sectionActionFantasy")}
-          filtro={{ campo: "genero", valor: "Acción" }}
+          filtro={{ campo: "genero", valor: "Action" }}
           orden="puntuacion"
         />
 

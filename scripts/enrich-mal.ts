@@ -29,14 +29,14 @@ interface AnimeRow {
   puntuacion_mal: number | null
 }
 
-interface JikanResponse {
+interface TenraiResponse {
   data?: {
     score?: number | null
     scored_by?: number | null
   }
 }
 
-const JIKAN_API_URL = "https://api.jikan.moe/v4"
+const TENRAI_API_URL = "https://api.tenrai.org/v1"
 const PAUSA_MS = 1100
 
 function dormir(ms: number): Promise<void> {
@@ -50,17 +50,17 @@ function parseLimit(): number | null {
   return Number.isInteger(valor) && valor > 0 ? valor : null
 }
 
-async function fetchJikan(malId: number): Promise<JikanResponse["data"] | null> {
-  let ultimoError = "Error desconocido de Jikan"
+async function fetchTenrai(malId: number): Promise<TenraiResponse["data"] | null> {
+  let ultimoError = "Error desconocido de Tenrai"
 
   for (let intento = 1; intento <= 3; intento++) {
     try {
-      const response = await fetch(`${JIKAN_API_URL}/anime/${malId}`, {
+      const response = await fetch(`${TENRAI_API_URL}/anime/${malId}`, {
         signal: AbortSignal.timeout(8000),
       })
 
       if (response.status === 429) {
-        ultimoError = "Jikan limitó las peticiones (429)"
+        ultimoError = "Tenrai limitó las peticiones (429)"
         await dormir(2000 * intento)
         continue
       }
@@ -69,7 +69,7 @@ async function fetchJikan(malId: number): Promise<JikanResponse["data"] | null> 
         return null
       }
 
-      const json = (await response.json()) as JikanResponse
+      const json = (await response.json()) as TenraiResponse
       return json.data || null
     } catch (err) {
       ultimoError = err instanceof Error ? err.message : "Error de red"
@@ -109,7 +109,7 @@ async function enrichMal() {
   for (const anime of animes) {
     if (typeof anime.mal_id !== "number") continue
 
-    const datos = await fetchJikan(anime.mal_id)
+    const datos = await fetchTenrai(anime.mal_id)
 
     if (datos && typeof datos.score === "number" && datos.score > 0) {
       const { error: updError } = await supabase

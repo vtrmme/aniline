@@ -113,7 +113,7 @@ export default function AdminPage() {
     )
   }
 
-  if (!session) {
+  if (status === "unauthenticated" || !session) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-gray-400">
         Necesitas iniciar sesion para ver esta pagina.
@@ -204,6 +204,7 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
 
 

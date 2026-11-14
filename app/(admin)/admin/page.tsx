@@ -101,9 +101,12 @@ export default function AdminPage() {
         }
       }
     }
-    void cargar()
+    const intervalId = setInterval(() => {
+      void cargar()
+    }, 15000)
     return () => {
       cancelado = true
+      clearInterval(intervalId)
     }
   }, [status, userId])
 
@@ -204,6 +207,7 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
 
 

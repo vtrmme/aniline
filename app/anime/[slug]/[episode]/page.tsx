@@ -237,8 +237,8 @@ export default function EpisodePage({
             finalizar,
           }),
         })
-      } catch {
-        // fallo silencioso: el registro de sesion es opcional
+      } catch (error) {
+        console.error("Error registrando sesion:", error)
       }
     },
     [userId, num]
@@ -464,6 +464,7 @@ export default function EpisodePage({
     </div>
   )
 }
+
 
 
 

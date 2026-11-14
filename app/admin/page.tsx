@@ -49,6 +49,7 @@ export default function AdminPage() {
 
   const { data: session, status } = useSession()
   const userId = (session?.user as { id?: string } | undefined)?.id ?? null
+  const email = (session?.user as { email?: string | null } | undefined)?.email ?? null
 
   const [usuarios, setUsuarios] = useState<number | null>(null)
   const [actividad, setActividad] = useState<ActividadItem[]>([])
@@ -116,6 +117,17 @@ export default function AdminPage() {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-gray-400">
         Necesitas iniciar sesion para ver esta pagina.
+      </div>
+    )
+  }
+
+  const emailAdmin = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase()
+  const esAdmin = !!emailAdmin && !!email && email.trim().toLowerCase() === emailAdmin
+
+  if (!esAdmin) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-20 text-gray-400">
+        No autorizado.
       </div>
     )
   }
@@ -192,5 +204,6 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
 

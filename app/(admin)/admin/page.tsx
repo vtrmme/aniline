@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase"
 
 
 
@@ -101,12 +102,22 @@ export default function AdminPage() {
         }
       }
     }
+    const supabase = createClient()
+    const canal = supabase
+      .channel("admin-sesiones")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "sesiones" },
+        () => { void cargar() }
+      )
+      .subscribe()
     const intervalId = setInterval(() => {
       void cargar()
     }, 15000)
     return () => {
       cancelado = true
       clearInterval(intervalId)
+      supabase.removeChannel(canal)
     }
   }, [status, userId])
 
@@ -207,6 +218,7 @@ export default function AdminPage() {
     </div>
   )
 }
+
 
 
 

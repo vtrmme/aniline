@@ -28,11 +28,21 @@ interface EnlaceNav {
 
 const PATREON_URL = "https://www.patreon.com/AniLine"
 
+const EMAIL_ADMIN = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase()
+
+function esEmailAdmin(email: string | null | undefined): boolean {
+  if (!email || !EMAIL_ADMIN) {
+    return false
+  }
+  return email.trim().toLowerCase() === EMAIL_ADMIN
+}
+
 function construirEnlaces(
   pathname: string,
   params: URLSearchParams,
   lang: "es" | "en",
-  haySesion: boolean
+  haySesion: boolean,
+  emailSesion: string | null
 ): EnlaceNav[] {
   const estado = params.get("estado")
   const orden = params.get("orden")
@@ -61,6 +71,10 @@ function construirEnlaces(
     enlaces.push({ href: "/perfil", label: t(lang, "navPerfil"), activo: pathname === "/perfil" })
   }
 
+  if (haySesion && esEmailAdmin(emailSesion)) {
+    enlaces.push({ href: "/admin", label: "Admin", activo: pathname === "/admin" })
+  }
+
   return enlaces
 }
 
@@ -80,7 +94,8 @@ function EnlacesNav({
     pathname,
     new URLSearchParams(searchParams.toString()),
     lang,
-    !!session
+    !!session,
+    (session?.user as unknown as { email?: string | null })?.email ?? null
   )
 
   if (variante === "desktop") {
@@ -345,3 +360,4 @@ export function Navbar() {
     </nav>
   )
 }
+

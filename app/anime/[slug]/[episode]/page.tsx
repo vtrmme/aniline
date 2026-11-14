@@ -127,6 +127,17 @@ export default function EpisodePage({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ anime_id: animeData.id, episodio_numero: num }),
           })
+
+          await fetch("/api/sesiones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              anime_id: animeData.id,
+              episodio_numero: num,
+              segundos: savedSeconds,
+              finalizar: false,
+            }),
+          })
         }
 
         // Lista completa de episodios para el selector y navegación prev/next
@@ -212,6 +223,27 @@ export default function EpisodePage({
     }
   }, [slug, num, streamLang])
 
+  const registrarSesion = useCallback(
+    async (segundos: number, finalizar: boolean) => {
+      if (!userId || !animeIdRef.current || num === null) return
+      try {
+        await fetch("/api/sesiones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            anime_id: animeIdRef.current,
+            episodio_numero: num,
+            segundos: Math.max(0, Math.floor(segundos)),
+            finalizar,
+          }),
+        })
+      } catch {
+        // fallo silencioso: el registro de sesion es opcional
+      }
+    },
+    [userId, num]
+  )
+
   const saveProgress = useCallback(
     async (segundos: number) => {
       if (!userId || !animeIdRef.current || num === null) return
@@ -231,9 +263,26 @@ export default function EpisodePage({
       } catch {
         // fallo silencioso: el progreso se reintentará
       }
+      await registrarSesion(value, false)
     },
-    [userId, num]
+    [userId, num, registrarSesion]
   )
+
+  useEffect(() => {
+    return () => {
+      if (!userId || !animeIdRef.current || num === null) return
+      void fetch("/api/sesiones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          anime_id: animeIdRef.current,
+          episodio_numero: num,
+          segundos: lastProgressRef.current,
+          finalizar: true,
+        }),
+      })
+    }
+  }, [userId, num])
 
   const handleMarkWatched = useCallback(() => {
     saveProgress(lastProgressRef.current)
@@ -415,3 +464,6 @@ export default function EpisodePage({
     </div>
   )
 }
+
+
+

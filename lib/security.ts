@@ -109,3 +109,16 @@ export function errorInterno(err: unknown): NextResponse {
 export function noAutorizado(): NextResponse {
   return NextResponse.json({ ok: false, error: "No autorizado." }, { status: 401 })
 }
+
+export function esOwner(userId: string | null, email: string | null | undefined): boolean {
+  const emailOwner = process.env.OWNER_EMAIL?.trim().toLowerCase()
+  if (emailOwner && email) {
+    return email.trim().toLowerCase() === emailOwner
+  }
+  const userIdOwner = process.env.OWNER_USER_ID?.trim()
+  if (userIdOwner && userId) {
+    return userId === userIdOwner
+  }
+  return false
+}
+

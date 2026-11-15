@@ -75,10 +75,7 @@ export function guardarTraduccionCacheada(clave: string, vtt: string): void {
   cacheTraducciones.set(clave, { valor: vtt, fecha: Date.now() })
 }
 
-async function llamarGtx(texto: string): Promise<string[] | null> {
-  const url =
-    "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=" +
-    encodeURIComponent(texto)
+async function llamarEndpointGtx(url: string): Promise<string[] | null> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLine)" },
@@ -98,6 +95,20 @@ async function llamarGtx(texto: string): Promise<string[] | null> {
   } catch {
     return null
   }
+}
+
+async function llamarGtx(texto: string): Promise<string[] | null> {
+  const q = encodeURIComponent(texto)
+  const urls = [
+    `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${q}`,
+    `https://translate.google.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${q}`,
+    `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=es&q=${q}`,
+  ]
+  for (const url of urls) {
+    const resultado = await llamarEndpointGtx(url)
+    if (resultado) return resultado
+  }
+  return null
 }
 
 async function traducirLote(

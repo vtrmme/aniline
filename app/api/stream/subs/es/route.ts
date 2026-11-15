@@ -49,13 +49,21 @@ export async function GET(req: Request) {
       )
     }
 
-    const vttTraducido = await traducirVttAEspanol(url.toString(), vttOriginal)
+    let vttTraducido: string
+    try {
+      vttTraducido = await traducirVttAEspanol(url.toString(), vttOriginal)
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: "No se pudo traducir el subtítulo en este momento" },
+        { status: 502 }
+      )
+    }
 
     return new NextResponse(vttTraducido, {
       status: 200,
       headers: {
         "Content-Type": "text/vtt; charset=utf-8",
-        "Cache-Control": "private, max-age=86400",
+        "Cache-Control": "private, max-age=3600",
       },
     })
   } catch (err) {

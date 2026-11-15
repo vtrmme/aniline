@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import { obtenerIP, usuarioAutenticado, respuestaLimite, noAutorizado, errorInterno } from "@/lib/security"
 import { srcValido, reescribirPlaylist } from "@/lib/hls-proxy"
+import { fetchViaProxy } from "@/lib/proxy"
 
 export async function GET(req: Request) {
   const user_id = await usuarioAutenticado(req)
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
       )
     }
 
-    const res = await fetch(url.toString(), {
+    const res = await fetchViaProxy(url.toString(), {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
       signal: AbortSignal.timeout(15000),
     })

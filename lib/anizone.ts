@@ -1,3 +1,5 @@
+import { fetchViaProxy } from "@/lib/proxy"
+
 export interface SubtituloAniZone {
   titulo: string
   formato: string
@@ -135,7 +137,7 @@ function itemsDeBusqueda(html: string): Array<{ slug: string; url: string }> {
 
 export async function probarAccesoAniZone(): Promise<number | null> {
   try {
-    const res = await fetch(`${BASE}/`, {
+    const res = await fetchViaProxy(`${BASE}/`, {
       headers: CABECERAS_NAVEGADOR,
       signal: AbortSignal.timeout(6000),
     })
@@ -157,7 +159,7 @@ export async function obtenerSlugAniZone(titulo: string): Promise<string | null>
   const urlBusqueda = `${BASE}/anime?search=${encodeURIComponent(titulo)}`
 
   try {
-    const resGet = await fetch(urlBusqueda, {
+    const resGet = await fetchViaProxy(urlBusqueda, {
       headers: CABECERAS_NAVEGADOR,
       signal: AbortSignal.timeout(6000),
     })
@@ -184,7 +186,7 @@ export async function obtenerSlugAniZone(titulo: string): Promise<string | null>
     }
     if (!snapshot) return null
 
-    const resPost = await fetch(`${BASE}/livewire/update`, {
+    const resPost = await fetchViaProxy(`${BASE}/livewire/update`, {
       method: "POST",
       headers: {
         ...CABECERAS_NAVEGADOR,
@@ -243,7 +245,7 @@ export async function obtenerStreamAniZone(
   }
 
   try {
-    const res = await fetch(`${BASE}/anime/${encodeURIComponent(slug)}/${episodio}`, {
+    const res = await fetchViaProxy(`${BASE}/anime/${encodeURIComponent(slug)}/${episodio}`, {
       headers: CABECERAS_NAVEGADOR,
       signal: AbortSignal.timeout(6000),
     })

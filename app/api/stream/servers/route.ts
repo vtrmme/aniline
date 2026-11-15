@@ -1,7 +1,7 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
-import { buildServers, getSubtituloLang, getFallbackSubtituloLang, type StreamLang, type StreamServer, type SubtitleLang } from "@/lib/streaming"
+import { buildServers, type StreamLang, type StreamServer } from "@/lib/streaming"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -27,40 +27,30 @@ function parseLang(value: string | null): StreamLang {
 async function resolveHls(
   anilistId: number,
   episode: number,
-  lang: StreamLang,
-  subLang?: SubtitleLang
+  lang: StreamLang
 ): Promise<string | null> {
   const baseUrl = process.env.STREAM_RESOLVER_URL
   if (!baseUrl || !baseUrl.trim()) return null
 
-  const versionesIntentar: string[] =
-    lang === "sub" && subLang
-      ? [subLang, getFallbackSubtituloLang(subLang)]
-      : [lang === "dub" ? "dub" : (subLang ?? "sub")]
+  try {
+    const url = new URL("/watch", baseUrl.trim())
+    url.searchParams.set("anilistId", String(anilistId))
+    url.searchParams.set("episode", String(episode))
+    url.searchParams.set("lang", lang)
 
-  for (const version of versionesIntentar) {
-    try {
-      const url = new URL("/watch", baseUrl.trim())
-      url.searchParams.set("anilistId", String(anilistId))
-      url.searchParams.set("episode", String(episode))
-      url.searchParams.set("lang", version)
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) })
+    if (!res.ok) return null
 
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) })
-      if (!res.ok) continue
-
-      const json = (await res.json()) as {
-        m3u8?: string
-        stream?: string
-        sources?: Array<{ url?: string }>
-      }
-
-      const resolved = json.m3u8 || json.stream || json.sources?.[0]?.url || null
-      if (resolved) return resolved
-    } catch {
+    const json = (await res.json()) as {
+      m3u8?: string
+      stream?: string
+      sources?: Array<{ url?: string }>
     }
-  }
 
-  return null
+    return json.m3u8 || json.stream || json.sources?.[0]?.url || null
+  } catch {
+    return null
+  }
 }
 
 export async function GET(req: Request) {
@@ -80,9 +70,6 @@ export async function GET(req: Request) {
     const slug = searchParams.get("slug")
     const episodeParam = searchParams.get("episode")
     const lang = parseLang(searchParams.get("lang"))
-    const subParam = searchParams.get("sub")
-    const subLang: SubtitleLang | null =
-      subParam === "es" || subParam === "en" ? subParam : getSubtituloLang("es")
 
     if (!slug || !episodeParam) {
       return NextResponse.json(
@@ -161,7 +148,7 @@ export async function GET(req: Request) {
 
     let hlsUrl: string | null = null
     if (rawAnilistId !== null) {
-      hlsUrl = await resolveHls(rawAnilistId, numero, lang, subLang)
+      hlsUrl = await resolveHls(rawAnilistId, numero, lang)
     }
 
     const descriptors: ServerDescriptor[] = servers.map((s) => ({

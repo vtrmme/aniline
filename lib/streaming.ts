@@ -2,38 +2,17 @@ export type ServerKind = "native" | "youtube" | "embed" | "hls"
 
 export type StreamLang = "sub" | "dub"
 
-export type SubtitleLang = "es" | "en"
-
 export interface StreamServer {
   id: string
   name: string
   kind: ServerKind
-  getEmbedUrl?: (anilistId: number, episode: number, lang: StreamLang, subLang?: SubtitleLang) => string
+  getEmbedUrl?: (anilistId: number, episode: number, lang: StreamLang) => string
 }
 
 export interface EmbedProvider {
   id: string
   name: string
-  getEmbedUrl: (anilistId: number, episode: number, lang: StreamLang, subLang?: SubtitleLang) => string
-}
-
-const SUBTITULOS_POR_IDIOMA: Record<string, SubtitleLang> = {
-  es: "es",
-  en: "en",
-}
-
-export function getSubtituloLang(lang: string | undefined): SubtitleLang {
-  const clave = lang === "en" ? "en" : "es"
-  return SUBTITULOS_POR_IDIOMA[clave]
-}
-
-export function getFallbackSubtituloLang(sub: SubtitleLang): SubtitleLang {
-  return sub === "es" ? "en" : "es"
-}
-
-export function versionStream(lang: StreamLang, subLang?: SubtitleLang): string {
-  if (lang === "dub") return "dub"
-  return subLang ?? "sub"
+  getEmbedUrl: (anilistId: number, episode: number, lang: StreamLang) => string
 }
 
 export interface EpisodeServersResponse {
@@ -47,14 +26,14 @@ const EMBED_PROVIDERS: EmbedProvider[] = [
   {
     id: "vidhawk",
     name: "VidHawk",
-    getEmbedUrl: (anilistId, episode, lang, subLang) =>
-      `https://vidhawk.buzz/embed/ani/${anilistId}/${episode}/${versionStream(lang, subLang)}`,
+    getEmbedUrl: (anilistId, episode, lang) =>
+      `https://vidhawk.buzz/embed/ani/${anilistId}/${episode}/${lang}`,
   },
   {
     id: "megaplay",
     name: "MegaPlay",
-    getEmbedUrl: (anilistId, episode, lang, subLang) =>
-      `https://megaplay.buzz/stream/ani/${anilistId}/${episode}/${versionStream(lang, subLang)}`,
+    getEmbedUrl: (anilistId, episode, lang) =>
+      `https://megaplay.buzz/stream/ani/${anilistId}/${episode}/${lang}`,
   },
 ]
 
@@ -109,22 +88,20 @@ export function getEmbedUrlFor(
   server: StreamServer,
   anilistId: number,
   episode: number,
-  lang: StreamLang,
-  subLang?: SubtitleLang
+  lang: StreamLang
 ): string | null {
   if (server.kind !== "embed" || !server.getEmbedUrl) return null
-  return server.getEmbedUrl(anilistId, episode, lang, subLang)
+  return server.getEmbedUrl(anilistId, episode, lang)
 }
 
 export function getEmbedUrlById(
   serverId: string,
   anilistId: number,
   episode: number,
-  lang: StreamLang,
-  subLang?: SubtitleLang
+  lang: StreamLang
 ): string | null {
   const provider = getEmbedProviders().find((p) => p.id === serverId)
-  return provider ? provider.getEmbedUrl(anilistId, episode, lang, subLang) : null
+  return provider ? provider.getEmbedUrl(anilistId, episode, lang) : null
 }
 
 const SERVER_STORAGE_PREFIX = "aniline-server:"

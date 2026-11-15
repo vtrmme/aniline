@@ -1,18 +1,14 @@
 "use client"
 
 import "plyr/dist/plyr.css"
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Hls from "hls.js"
 import { extractYouTubeId } from "@/components/VideoPlayer"
-import { useLanguage } from "@/contexts/LanguageContext"
 import {
   getEmbedUrlById,
-  getFallbackSubtituloLang,
-  getSubtituloLang,
   loadStoredServer,
   storeServer,
   type StreamLang,
-  type SubtitleLang,
 } from "@/lib/streaming"
 
 export interface StreamServerInfo {
@@ -70,8 +66,6 @@ export function EpisodePlayer({
   const onProgressRef = useRef(onProgress)
   const onMarkWatchedRef = useRef(onMarkWatched)
   const initialSecondsRef = useRef(initialSeconds)
-  const { lang: uiLang } = useLanguage()
-  const subLang: SubtitleLang = getSubtituloLang(uiLang)
 
   const [manualId, setManualId] = useState<string | null>(null)
 
@@ -112,59 +106,16 @@ export function EpisodePlayer({
     onMarkWatchedRef.current?.()
   }, [])
 
-  const [embedCandidateIdx, setEmbedCandidateIdx] = useState(0)
-
-  const embedCandidates = useMemo((): string[] => {
-    if (selected?.kind !== "embed" || anilistId === null) return []
-    const primary = getEmbedUrlById(selected.id, anilistId, episode, lang, subLang)
-    const candidates: string[] = []
-    if (primary) candidates.push(primary)
-    if (lang === "sub" && subLang) {
-      const fallback = getEmbedUrlById(selected.id, anilistId, episode, lang, getFallbackSubtituloLang(subLang))
-      if (fallback && !candidates.includes(fallback)) candidates.push(fallback)
-    }
-    return candidates
-  }, [selected, anilistId, episode, lang, subLang])
-
-  const embedCandidateKey = selected?.kind === "embed" && anilistId !== null
-    ? `${selected.id}:${anilistId}:${episode}:${lang}:${subLang}`
-    : ""
-
-  const [prevEmbedCandidateKey, setPrevEmbedCandidateKey] = useState(embedCandidateKey)
-
-  if (embedCandidateKey !== prevEmbedCandidateKey) {
-    setPrevEmbedCandidateKey(embedCandidateKey)
-    setEmbedCandidateIdx(0)
-  }
-
-  const embedSrc = selected?.kind === "embed" && anilistId !== null ? (embedCandidates[embedCandidateIdx] ?? null) : null
-
-  const handleEmbedLoad = useCallback(
-    (event: SyntheticEvent<HTMLIFrameElement>) => {
-      let readable = true
-      try {
-        const href = event.currentTarget.contentWindow?.location?.href
-        if (typeof href === "string") {
-          readable = true
-        }
-      } catch {
-        readable = false
-      }
-      if (lang === "sub" && subLang === "es" && readable === false && embedCandidates.length > 1 && embedCandidateIdx === 0 && embedSrc) {
-        setEmbedCandidateIdx(1)
-      }
-    },
-    [lang, subLang, embedCandidates, embedCandidateIdx, embedSrc]
-  )
-
   const currentSrc = useMemo(() => {
     if (!selected) return null
     if (selected.kind === "native") return nativeUrl
     if (selected.kind === "hls") return hlsUrl
     if (selected.kind === "youtube") return youtubeUrl
-    if (selected.kind === "embed" && anilistId !== null) return embedSrc
+    if (selected.kind === "embed" && anilistId !== null) {
+      return getEmbedUrlById(selected.id, anilistId, episode, lang)
+    }
     return null
-  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, embedSrc])
+  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, episode, lang])
 
   useEffect(() => {
     if (!selected) return
@@ -353,16 +304,14 @@ export function EpisodePlayer({
         {selected.kind === "youtube" && (
           <YouTubeFrame url={currentSrc} invalidLabel={labels.invalidYoutube} />
         )}
-        {selected.kind === "embed" && embedSrc && (
+        {selected.kind === "embed" && (
           <iframe
-            key={`${embedCandidateKey}-${embedCandidateIdx}`}
-            src={embedSrc}
+            src={currentSrc}
             title={`Episodio ${episode}`}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             onMouseDown={registerEmbedInteraction}
-            onLoad={handleEmbedLoad}
           />
         )}
         {supportsLang && (

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import type { Anime, Episode } from "@/types"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
-import { getSubtituloLang, type StreamLang } from "@/lib/streaming"
+import { type StreamLang } from "@/lib/streaming"
 
 interface StreamData {
   servers: StreamServerInfo[]
@@ -193,7 +193,7 @@ export default function EpisodePage({
     const fetchServers = async () => {
       try {
         const res = await fetch(
-          `/api/stream/servers?slug=${encodeURIComponent(slug)}&episode=${num}&lang=${streamLang}&sub=${getSubtituloLang(lang)}`
+          `/api/stream/servers?slug=${encodeURIComponent(slug)}&episode=${num}&lang=${streamLang}`
         )
         if (!res.ok) return
         const json = (await res.json()) as {

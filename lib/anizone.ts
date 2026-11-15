@@ -137,7 +137,7 @@ export async function obtenerSlugAniZone(titulo: string): Promise<string | null>
   try {
     const resGet = await fetch(urlBusqueda, {
       headers: { "User-Agent": UA_NAVEGADOR, Accept: "text/html" },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(6000),
     })
     if (!resGet.ok) return null
     const html = await resGet.text()
@@ -179,7 +179,7 @@ export async function obtenerSlugAniZone(titulo: string): Promise<string | null>
           { snapshot, updates: { search: titulo }, calls: [] },
         ],
       }),
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(6000),
     })
     if (!resPost.ok) return null
 
@@ -220,7 +220,7 @@ export async function obtenerStreamAniZone(
   try {
     const res = await fetch(`${BASE}/anime/${encodeURIComponent(slug)}/${episodio}`, {
       headers: { "User-Agent": UA_NAVEGADOR, Accept: "text/html" },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(6000),
     })
     if (!res.ok) return null
     const html = await res.text()

@@ -173,12 +173,27 @@ export async function GET(req: Request) {
     const hlsUrls: Record<string, string> = {}
     const subtitulos: SubtitleTrack[] = []
 
+    let debugSubEs: {
+      titulo: string
+      slug: boolean
+      stream: boolean
+      subdlKey: boolean
+    } | null = null
+
     if (rawAnilistId !== null && lang === "sub") {
       const titulo = (anime.title_en || anime.title_es || "").trim()
+      debugSubEs = {
+        titulo,
+        slug: false,
+        stream: false,
+        subdlKey: !!process.env.SUBDL_API_KEY,
+      }
       if (titulo) {
         const slugAz = await obtenerSlugAniZone(titulo)
+        debugSubEs.slug = !!slugAz
         if (slugAz) {
           const streamAz = await obtenerStreamAniZone(slugAz, numero)
+          debugSubEs.stream = !!streamAz
           if (streamAz) {
             hlsUrls["sub-es"] = `/api/stream/anizone/m3u8?src=${encodeURIComponent(streamAz.m3u8)}`
 
@@ -244,6 +259,7 @@ export async function GET(req: Request) {
       hlsUrl,
       hlsUrls,
       subtitles: subtitulos,
+      debugSubEs,
     })
   } catch (err) {
     return errorInterno(err)

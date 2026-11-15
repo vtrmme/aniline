@@ -4,11 +4,14 @@ import "plyr/dist/plyr.css"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Hls from "hls.js"
 import { extractYouTubeId } from "@/components/VideoPlayer"
+import { useLanguage } from "@/contexts/LanguageContext"
 import {
   getEmbedUrlById,
+  getSubtituloLang,
   loadStoredServer,
   storeServer,
   type StreamLang,
+  type SubtitleLang,
 } from "@/lib/streaming"
 
 export interface StreamServerInfo {
@@ -66,6 +69,8 @@ export function EpisodePlayer({
   const onProgressRef = useRef(onProgress)
   const onMarkWatchedRef = useRef(onMarkWatched)
   const initialSecondsRef = useRef(initialSeconds)
+  const { lang: uiLang } = useLanguage()
+  const subLang: SubtitleLang = getSubtituloLang(uiLang)
 
   const [manualId, setManualId] = useState<string | null>(null)
 
@@ -112,10 +117,10 @@ export function EpisodePlayer({
     if (selected.kind === "hls") return hlsUrl
     if (selected.kind === "youtube") return youtubeUrl
     if (selected.kind === "embed" && anilistId !== null) {
-      return getEmbedUrlById(selected.id, anilistId, episode, lang)
+      return getEmbedUrlById(selected.id, anilistId, episode, lang, subLang)
     }
     return null
-  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, episode, lang])
+  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, episode, lang, subLang])
 
   useEffect(() => {
     if (!selected) return

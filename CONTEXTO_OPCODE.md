@@ -166,9 +166,10 @@ Toda función de servidor que escriba en Supabase debe usar `createServerClient(
 
 ## 6. Sistema de servidores de streaming
 
-- `GET /api/stream/servers?slug=...&episode=...&lang=sub|dub` → lista de servidores (Supabase propio, embeds por AniList ID, YouTube) + URL firmada + `hlsUrl` opcional.
+- `GET /api/stream/servers?slug=...&episode=...&lang=sub|dub&sub=es|en` → lista de servidores (Supabase propio, embeds por AniList ID, YouTube) + URL firmada + `hlsUrl` opcional.
 - Los embeds se construyen en cliente con `lib/streaming.ts` a partir del `anilist_id` del anime (columna añadida en `supabase_migration_streaming.sql`).
 - Si existe `STREAM_RESOLVER_URL`, se consulta `/watch?anilistId=&episode=&lang=` y se añade la pestaña **HD (m3u8)**.
+- Subtítulos: `lang=sub` resuelve el idioma de subtítulo preferido (`sub` param, por defecto español → `es`). Si el idioma preferido no existe para el episodio, el resolver hace fallback automático al otro (`es` → `en`). Los embeds se generan con la versión de idioma (`es`/`en`/`sub`/`dub`).
 - Progreso: nativo/HLS guarda segundos vía `/api/historial`; en embeds (cross-origin) solo botón "Marcar como visto" + guardado al salir de la pestaña.
 
 ---

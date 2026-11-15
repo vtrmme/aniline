@@ -150,11 +150,11 @@ export function EpisodePlayer({
       } catch {
         readable = false
       }
-      if (lang === "sub" && readable === false && embedCandidates.length > 1 && embedCandidateIdx === 0 && embedSrc) {
+      if (lang === "sub" && subLang === "es" && readable === false && embedCandidates.length > 1 && embedCandidateIdx === 0 && embedSrc) {
         setEmbedCandidateIdx(1)
       }
     },
-    [lang, embedCandidates, embedCandidateIdx, embedSrc]
+    [lang, subLang, embedCandidates, embedCandidateIdx, embedSrc]
   )
 
   const currentSrc = useMemo(() => {

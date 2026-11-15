@@ -45,16 +45,16 @@ export interface EpisodeServersResponse {
 
 const EMBED_PROVIDERS: EmbedProvider[] = [
   {
-    id: "megaplay",
-    name: "MegaPlay",
-    getEmbedUrl: (anilistId, episode, lang, subLang) =>
-      `https://megaplay.buzz/stream/ani/${anilistId}/${episode}/${versionStream(lang, subLang)}`,
-  },
-  {
     id: "vidhawk",
     name: "VidHawk",
     getEmbedUrl: (anilistId, episode, lang, subLang) =>
       `https://vidhawk.buzz/embed/ani/${anilistId}/${episode}/${versionStream(lang, subLang)}`,
+  },
+  {
+    id: "megaplay",
+    name: "MegaPlay",
+    getEmbedUrl: (anilistId, episode, lang, subLang) =>
+      `https://megaplay.buzz/stream/ani/${anilistId}/${episode}/${versionStream(lang, subLang)}`,
   },
 ]
 

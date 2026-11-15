@@ -1,17 +1,11 @@
 import { createServerClient } from "@/lib/supabase"
-import { NextResponse, after } from "next/server"
+import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import {
   buildServers,
   type StreamLang,
   type StreamServer,
-  type SubtitleTrack,
 } from "@/lib/streaming"
-import { obtenerSlugAniZone, obtenerStreamAniZone } from "@/lib/anizone"
-import { obtenerSubtituloEspanol } from "@/lib/subdl"
-import { traducirVttAEspanol } from "@/lib/translate"
-import { aVtt } from "@/lib/subtitle-convert"
-import { fetchConReleVidCdn } from "@/lib/relay-vidcdn"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -171,89 +165,6 @@ export async function GET(req: Request) {
       descriptors.unshift({ id: "hls", name: "HD", kind: "hls" })
     }
 
-    const hlsUrls: Record<string, string> = {}
-    const subtitulos: SubtitleTrack[] = []
-
-    let debugSubEs: {
-      titulo: string
-      slug: boolean
-      stream: boolean
-      subdlKey: boolean
-      estadoAniZone: number | null
-    } | null = null
-
-    if (rawAnilistId !== null && lang === "sub") {
-      const titulo = (anime.title_en || anime.title_es || "").trim()
-      debugSubEs = {
-        titulo,
-        slug: false,
-        stream: false,
-        subdlKey: !!process.env.SUBDL_API_KEY,
-        estadoAniZone: null,
-      }
-      if (titulo) {
-        const { slug: slugAz, estado } = await obtenerSlugAniZone(titulo)
-        debugSubEs.estadoAniZone = estado
-        debugSubEs.slug = !!slugAz
-        if (slugAz) {
-          const streamAz = await obtenerStreamAniZone(slugAz, numero)
-          debugSubEs.stream = !!streamAz
-          if (streamAz) {
-            hlsUrls["sub-es"] = `/api/stream/anizone/m3u8?src=${encodeURIComponent(streamAz.m3u8)}`
-
-            const fuenteEn = streamAz.subtitulos.find(
-              (s) => s.idioma.startsWith("en") || /^ingles/i.test(s.titulo)
-            )
-            if (fuenteEn) {
-              subtitulos.push({
-                src: `/api/stream/subs/es?src=${encodeURIComponent(fuenteEn.archivo)}`,
-                label: "Español",
-                lang: "es",
-                default: true,
-              })
-              subtitulos.push({
-                src: `/api/stream/anizone/seg?as=vtt&src=${encodeURIComponent(fuenteEn.archivo)}`,
-                label: "Inglés",
-                lang: "en",
-              })
-
-              const archivoEn = fuenteEn.archivo
-              after(async () => {
-                try {
-                  const resSub = await fetchConReleVidCdn(archivoEn, {
-                    headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
-                    signal: AbortSignal.timeout(30000),
-                  })
-                  if (!resSub.ok) return
-                  const crudo = await resSub.text()
-                  const formato = new URL(archivoEn).pathname
-                    .toLowerCase()
-                    .endsWith(".ass")
-                    ? "ass"
-                    : "srt"
-                  const vttEn = aVtt(crudo, formato)
-                  await traducirVttAEspanol(archivoEn, vttEn)
-                } catch {
-                  // el precalentamiento no debe romper la respuesta
-                }
-              })
-            }
-
-            const espanol = await obtenerSubtituloEspanol(titulo, numero)
-            if (espanol) {
-              subtitulos.unshift({
-                src: `/api/stream/subs/vtt?u=${encodeURIComponent(espanol.url)}&f=${espanol.formato}`,
-                label: "Español",
-                lang: "es",
-                default: true,
-              })
-            }
-            descriptors.unshift({ id: "sub-es", name: "Sub español", kind: "hls" })
-          }
-        }
-      }
-    }
-
     return NextResponse.json({
       ok: true,
       anilistId: rawAnilistId,
@@ -261,9 +172,6 @@ export async function GET(req: Request) {
       nativeUrl,
       youtubeUrl: episode.youtube_url || null,
       hlsUrl,
-      hlsUrls,
-      subtitles: subtitulos,
-      debugSubEs,
     })
   } catch (err) {
     return errorInterno(err)

@@ -11,6 +11,7 @@ import { obtenerSlugAniZone, obtenerStreamAniZone } from "@/lib/anizone"
 import { obtenerSubtituloEspanol } from "@/lib/subdl"
 import { traducirVttAEspanol } from "@/lib/translate"
 import { aVtt } from "@/lib/subtitle-convert"
+import { fetchConReleVidCdn } from "@/lib/relay-vidcdn"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -219,7 +220,7 @@ export async function GET(req: Request) {
               const archivoEn = fuenteEn.archivo
               after(async () => {
                 try {
-                  const resSub = await fetch(archivoEn, {
+                  const resSub = await fetchConReleVidCdn(archivoEn, {
                     headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
                     signal: AbortSignal.timeout(30000),
                   })

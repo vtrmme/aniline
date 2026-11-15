@@ -4,8 +4,7 @@ import { obtenerIP, usuarioAutenticado, respuestaLimite, noAutorizado, errorInte
 import { srcValido } from "@/lib/hls-proxy"
 import { aVtt, esFormatoSubtituloValido } from "@/lib/subtitle-convert"
 import { traducirVttAEspanol } from "@/lib/translate"
-
-export const runtime = "edge"
+import { fetchConReleVidCdn } from "@/lib/relay-vidcdn"
 
 export async function GET(req: Request) {
   const user_id = await usuarioAutenticado(req)
@@ -29,7 +28,7 @@ export async function GET(req: Request) {
       )
     }
 
-    const res = await fetch(url.toString(), {
+    const res = await fetchConReleVidCdn(url.toString(), {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
       signal: AbortSignal.timeout(30000),
     })

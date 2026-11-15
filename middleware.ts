@@ -46,7 +46,7 @@ function construirCsp(): string {
     "connect-src 'self' https://graphql.anilist.co https://*.supabase.co",
     "media-src 'self' blob: https:",
     "worker-src 'self' blob:",
-    "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://megaplay.buzz https://vidhawk.buzz",
+    "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://megaplay.buzz https://vidhawk.buzz https://megavid.buzz https://anixo.buzz",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

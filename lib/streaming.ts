@@ -35,6 +35,18 @@ const EMBED_PROVIDERS: EmbedProvider[] = [
     getEmbedUrl: (anilistId, episode, lang) =>
       `https://megaplay.buzz/stream/ani/${anilistId}/${episode}/${lang}`,
   },
+  {
+    id: "megavid",
+    name: "MegaVid",
+    getEmbedUrl: (anilistId, episode, lang) =>
+      `https://megavid.buzz/ani/${anilistId}/${episode}/${lang}`,
+  },
+  {
+    id: "anixo",
+    name: "AniXo",
+    getEmbedUrl: (anilistId, episode, lang) =>
+      `https://anixo.buzz/embed/ani/${anilistId}/${episode}/${lang}`,
+  },
 ]
 
 function getEnabledProviderIds(): string[] {

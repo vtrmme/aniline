@@ -15,10 +15,19 @@ export interface EmbedProvider {
   getEmbedUrl: (anilistId: number, episode: number, lang: StreamLang) => string
 }
 
+export interface SubtitleTrack {
+  src: string
+  label: string
+  lang: string
+  default?: boolean
+}
+
 export interface EpisodeServersResponse {
   ok: boolean
   servers: StreamServer[]
   hlsUrl?: string | null
+  hlsUrls?: Record<string, string>
+  subtitles?: SubtitleTrack[]
   error?: string
 }
 

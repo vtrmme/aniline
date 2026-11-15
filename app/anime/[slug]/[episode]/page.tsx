@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { VideoPlayer } from "@/components/VideoPlayer"
-import { EpisodePlayer, type StreamServerInfo } from "@/components/EpisodePlayer"
+import { EpisodePlayer, type StreamServerInfo, type SubtitleTrackInfo } from "@/components/EpisodePlayer"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react"
@@ -19,6 +19,8 @@ interface StreamData {
   nativeUrl: string | null
   youtubeUrl: string | null
   hlsUrl: string | null
+  hlsUrls: Record<string, string>
+  subtitles: SubtitleTrackInfo[]
 }
 
 export default function EpisodePage({
@@ -203,6 +205,8 @@ export default function EpisodePage({
           nativeUrl?: string | null
           youtubeUrl?: string | null
           hlsUrl?: string | null
+          hlsUrls?: Record<string, string>
+          subtitles?: SubtitleTrackInfo[]
         }
         if (cancelled || !json.ok || !Array.isArray(json.servers)) return
         setStreamData({
@@ -211,6 +215,8 @@ export default function EpisodePage({
           nativeUrl: json.nativeUrl || null,
           youtubeUrl: json.youtubeUrl || null,
           hlsUrl: json.hlsUrl || null,
+          hlsUrls: json.hlsUrls || {},
+          subtitles: Array.isArray(json.subtitles) ? json.subtitles : [],
         })
       } catch {
         // sin red: se mantiene el reproductor local
@@ -366,6 +372,8 @@ export default function EpisodePage({
                   nativeUrl={streamData.nativeUrl || videoUrl}
                   youtubeUrl={streamData.youtubeUrl || youtubeUrl}
                   hlsUrl={streamData.hlsUrl}
+                  hlsUrls={streamData.hlsUrls}
+                  subtitles={streamData.subtitles}
                   storageKey={`${anime.slug}:${episodeData.numero}`}
                   initialSeconds={savedSeconds}
                   onProgress={saveProgress}

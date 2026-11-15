@@ -1,7 +1,14 @@
 import { createServerClient } from "@/lib/supabase"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
-import { buildServers, type StreamLang, type StreamServer } from "@/lib/streaming"
+import {
+  buildServers,
+  type StreamLang,
+  type StreamServer,
+  type SubtitleTrack,
+} from "@/lib/streaming"
+import { obtenerSlugAniZone, obtenerStreamAniZone } from "@/lib/anizone"
+import { obtenerSubtituloEspanol } from "@/lib/subdl"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -97,7 +104,7 @@ export async function GET(req: Request) {
 
     const { data: anime, error: animeError } = await supabase
       .from("animes")
-      .select("id, slug, anilist_id")
+      .select("id, slug, anilist_id, title_es, title_en")
       .eq("slug", slug)
       .single()
 
@@ -161,6 +168,39 @@ export async function GET(req: Request) {
       descriptors.unshift({ id: "hls", name: "HD", kind: "hls" })
     }
 
+    const hlsUrls: Record<string, string> = {}
+    const subtitulos: SubtitleTrack[] = []
+
+    if (rawAnilistId !== null && lang === "sub") {
+      const titulo = (anime.title_en || anime.title_es || "").trim()
+      if (titulo) {
+        const slugAz = await obtenerSlugAniZone(titulo)
+        if (slugAz) {
+          const streamAz = await obtenerStreamAniZone(slugAz, numero)
+          if (streamAz) {
+            hlsUrls["sub-es"] = `/api/stream/anizone/m3u8?src=${encodeURIComponent(streamAz.m3u8)}`
+            for (const sub of streamAz.subtitulos) {
+              subtitulos.push({
+                src: `/api/stream/anizone/seg?as=vtt&src=${encodeURIComponent(sub.archivo)}`,
+                label: sub.titulo,
+                lang: sub.idioma,
+              })
+            }
+            const espanol = await obtenerSubtituloEspanol(titulo, numero)
+            if (espanol) {
+              subtitulos.unshift({
+                src: `/api/stream/subs/vtt?u=${encodeURIComponent(espanol.url)}&f=${espanol.formato}`,
+                label: "Español",
+                lang: "es",
+                default: true,
+              })
+            }
+            descriptors.unshift({ id: "sub-es", name: "Sub español", kind: "hls" })
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       anilistId: rawAnilistId,
@@ -168,6 +208,8 @@ export async function GET(req: Request) {
       nativeUrl,
       youtubeUrl: episode.youtube_url || null,
       hlsUrl,
+      hlsUrls,
+      subtitles: subtitulos,
     })
   } catch (err) {
     return errorInterno(err)

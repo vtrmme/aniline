@@ -17,6 +17,13 @@ export interface StreamServerInfo {
   kind: "native" | "youtube" | "embed" | "hls"
 }
 
+export interface SubtitleTrackInfo {
+  src: string
+  label: string
+  lang: string
+  default?: boolean
+}
+
 interface EpisodePlayerProps {
   servers: StreamServerInfo[]
   anilistId: number | null
@@ -26,6 +33,8 @@ interface EpisodePlayerProps {
   nativeUrl: string | null
   youtubeUrl: string | null
   hlsUrl: string | null
+  hlsUrls?: Record<string, string>
+  subtitles?: SubtitleTrackInfo[]
   storageKey: string
   initialSeconds?: number
   onProgress?: (seconds: number) => void
@@ -52,6 +61,8 @@ export function EpisodePlayer({
   nativeUrl,
   youtubeUrl,
   hlsUrl,
+  hlsUrls,
+  subtitles,
   storageKey,
   initialSeconds = 0,
   onProgress,
@@ -109,13 +120,21 @@ export function EpisodePlayer({
   const currentSrc = useMemo(() => {
     if (!selected) return null
     if (selected.kind === "native") return nativeUrl
-    if (selected.kind === "hls") return hlsUrl
+    if (selected.kind === "hls") {
+      const propia = hlsUrls?.[selected.id]
+      return typeof propia === "string" ? propia : hlsUrl
+    }
     if (selected.kind === "youtube") return youtubeUrl
     if (selected.kind === "embed" && anilistId !== null) {
       return getEmbedUrlById(selected.id, anilistId, episode, lang)
     }
     return null
-  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, episode, lang])
+  }, [selected, nativeUrl, hlsUrl, hlsUrls, youtubeUrl, anilistId, episode, lang])
+
+  const pistas = useMemo(() => {
+    if (!selected) return []
+    return selected.kind === "hls" && Array.isArray(subtitles) ? subtitles : []
+  }, [selected, subtitles])
 
   useEffect(() => {
     if (!selected) return
@@ -139,6 +158,7 @@ export function EpisodePlayer({
             "current-time",
             "mute",
             "volume",
+            "captions",
             "fullscreen",
           ],
         })
@@ -299,7 +319,18 @@ export function EpisodePlayer({
 
       <div className="bg-gray-900 rounded-xl overflow-hidden shadow-2xl aspect-video w-full relative">
         {(selected.kind === "native" || selected.kind === "hls") && (
-          <video ref={videoRef} className="w-full h-full" />
+          <video ref={videoRef} className="w-full h-full">
+            {pistas.map((t) => (
+              <track
+                key={t.src}
+                kind="subtitles"
+                src={t.src}
+                label={t.label}
+                srcLang={t.lang}
+                default={t.default === true}
+              />
+            ))}
+          </video>
         )}
         {selected.kind === "youtube" && (
           <YouTubeFrame url={currentSrc} invalidLabel={labels.invalidYoutube} />

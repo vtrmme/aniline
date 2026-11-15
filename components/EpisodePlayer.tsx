@@ -1,12 +1,13 @@
 "use client"
 
 import "plyr/dist/plyr.css"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react"
 import Hls from "hls.js"
 import { extractYouTubeId } from "@/components/VideoPlayer"
 import { useLanguage } from "@/contexts/LanguageContext"
 import {
   getEmbedUrlById,
+  getFallbackSubtituloLang,
   getSubtituloLang,
   loadStoredServer,
   storeServer,
@@ -111,16 +112,59 @@ export function EpisodePlayer({
     onMarkWatchedRef.current?.()
   }, [])
 
+  const [embedCandidateIdx, setEmbedCandidateIdx] = useState(0)
+
+  const embedCandidates = useMemo((): string[] => {
+    if (selected?.kind !== "embed" || anilistId === null) return []
+    const primary = getEmbedUrlById(selected.id, anilistId, episode, lang, subLang)
+    const candidates: string[] = []
+    if (primary) candidates.push(primary)
+    if (lang === "sub" && subLang) {
+      const fallback = getEmbedUrlById(selected.id, anilistId, episode, lang, getFallbackSubtituloLang(subLang))
+      if (fallback && !candidates.includes(fallback)) candidates.push(fallback)
+    }
+    return candidates
+  }, [selected, anilistId, episode, lang, subLang])
+
+  const embedCandidateKey = selected?.kind === "embed" && anilistId !== null
+    ? `${selected.id}:${anilistId}:${episode}:${lang}:${subLang}`
+    : ""
+
+  const [prevEmbedCandidateKey, setPrevEmbedCandidateKey] = useState(embedCandidateKey)
+
+  if (embedCandidateKey !== prevEmbedCandidateKey) {
+    setPrevEmbedCandidateKey(embedCandidateKey)
+    setEmbedCandidateIdx(0)
+  }
+
+  const embedSrc = selected?.kind === "embed" && anilistId !== null ? (embedCandidates[embedCandidateIdx] ?? null) : null
+
+  const handleEmbedLoad = useCallback(
+    (event: SyntheticEvent<HTMLIFrameElement>) => {
+      let readable = true
+      try {
+        const href = event.currentTarget.contentWindow?.location?.href
+        if (typeof href === "string") {
+          readable = true
+        }
+      } catch {
+        readable = false
+      }
+      if (lang === "sub" && readable === false && embedCandidates.length > 1 && embedCandidateIdx === 0 && embedSrc) {
+        setEmbedCandidateIdx(1)
+      }
+    },
+    [lang, embedCandidates, embedCandidateIdx, embedSrc]
+  )
+
   const currentSrc = useMemo(() => {
     if (!selected) return null
     if (selected.kind === "native") return nativeUrl
     if (selected.kind === "hls") return hlsUrl
     if (selected.kind === "youtube") return youtubeUrl
-    if (selected.kind === "embed" && anilistId !== null) {
-      return getEmbedUrlById(selected.id, anilistId, episode, lang, subLang)
-    }
+    if (selected.kind === "embed" && anilistId !== null) return embedSrc
     return null
-  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, episode, lang, subLang])
+  }, [selected, nativeUrl, hlsUrl, youtubeUrl, anilistId, embedSrc])
 
   useEffect(() => {
     if (!selected) return
@@ -309,14 +353,16 @@ export function EpisodePlayer({
         {selected.kind === "youtube" && (
           <YouTubeFrame url={currentSrc} invalidLabel={labels.invalidYoutube} />
         )}
-        {selected.kind === "embed" && (
+        {selected.kind === "embed" && embedSrc && (
           <iframe
-            src={currentSrc}
+            key={`${embedCandidateKey}-${embedCandidateIdx}`}
+            src={embedSrc}
             title={`Episodio ${episode}`}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             onMouseDown={registerEmbedInteraction}
+            onLoad={handleEmbedLoad}
           />
         )}
         {supportsLang && (

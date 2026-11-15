@@ -171,6 +171,7 @@ export async function traducirVttAEspanol(
   }
   if (actual.length > 0) lotes.push(actual)
 
+  let traducidas = 0
   const CONCURRENCIA = 8
   for (let i = 0; i < lotes.length; i += CONCURRENCIA) {
     const grupo = lotes.slice(i, i + CONCURRENCIA)
@@ -184,9 +185,14 @@ export async function traducirVttAEspanol(
         for (let k = 0; k < grupo[j].length && k < textos.length; k++) {
           const tarea = grupo[j][k]
           bloques[tarea.bloque].lineas[tarea.linea] = textos[k]
+          traducidas++
         }
       }
     }
+  }
+
+  if (traducidas === 0 && tareas.length > 0) {
+    throw new Error("No se pudo traducir el subt?tulo")
   }
 
   const salida: string[] = ["WEBVTT", ""]

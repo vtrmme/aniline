@@ -7,11 +7,10 @@ import {
   type StreamServer,
   type SubtitleTrack,
 } from "@/lib/streaming"
-import { obtenerSlugAniZone, obtenerStreamAniZone, probarAccesoAniZone } from "@/lib/anizone"
+import { obtenerSlugAniZone, obtenerStreamAniZone } from "@/lib/anizone"
 import { obtenerSubtituloEspanol } from "@/lib/subdl"
 import { traducirVttAEspanol } from "@/lib/translate"
 import { aVtt } from "@/lib/subtitle-convert"
-import { fetchViaProxy } from "@/lib/proxy"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -184,16 +183,16 @@ export async function GET(req: Request) {
 
     if (rawAnilistId !== null && lang === "sub") {
       const titulo = (anime.title_en || anime.title_es || "").trim()
-      const estadoAniZone = await probarAccesoAniZone()
       debugSubEs = {
         titulo,
         slug: false,
         stream: false,
         subdlKey: !!process.env.SUBDL_API_KEY,
-        estadoAniZone,
+        estadoAniZone: null,
       }
       if (titulo) {
-        const slugAz = await obtenerSlugAniZone(titulo)
+        const { slug: slugAz, estado } = await obtenerSlugAniZone(titulo)
+        debugSubEs.estadoAniZone = estado
         debugSubEs.slug = !!slugAz
         if (slugAz) {
           const streamAz = await obtenerStreamAniZone(slugAz, numero)
@@ -220,7 +219,7 @@ export async function GET(req: Request) {
               const archivoEn = fuenteEn.archivo
               after(async () => {
                 try {
-                  const resSub = await fetchViaProxy(archivoEn, {
+                  const resSub = await fetch(archivoEn, {
                     headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
                     signal: AbortSignal.timeout(30000),
                   })

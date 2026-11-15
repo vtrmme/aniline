@@ -3,7 +3,6 @@ import { rateLimit } from "@/lib/rate-limit"
 import { obtenerIP, usuarioAutenticado, respuestaLimite, noAutorizado, errorInterno } from "@/lib/security"
 import { srcValido, reescribirPlaylist } from "@/lib/hls-proxy"
 import { aVtt, esFormatoSubtituloValido } from "@/lib/subtitle-convert"
-import { fetchViaProxy } from "@/lib/proxy"
 
 interface ResultadoSrc {
   url: URL | null
@@ -51,7 +50,7 @@ export async function GET(req: Request) {
 
   try {
     const rango = req.headers.get("range")
-    const res = await fetchViaProxy(url.toString(), {
+    const res = await fetch(url.toString(), {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)",
         ...(rango ? { Range: rango } : {}),

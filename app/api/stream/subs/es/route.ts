@@ -4,7 +4,6 @@ import { obtenerIP, usuarioAutenticado, respuestaLimite, noAutorizado, errorInte
 import { srcValido } from "@/lib/hls-proxy"
 import { aVtt, esFormatoSubtituloValido } from "@/lib/subtitle-convert"
 import { traducirVttAEspanol } from "@/lib/translate"
-import { fetchViaProxy } from "@/lib/proxy"
 
 export async function GET(req: Request) {
   const user_id = await usuarioAutenticado(req)
@@ -28,7 +27,7 @@ export async function GET(req: Request) {
       )
     }
 
-    const res = await fetchViaProxy(url.toString(), {
+    const res = await fetch(url.toString(), {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
       signal: AbortSignal.timeout(30000),
     })

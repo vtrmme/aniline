@@ -10,8 +10,18 @@ export interface StreamAniZone {
   subtitulos: SubtituloAniZone[]
 }
 
-const UA_NAVEGADOR =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+const CABECERAS_NAVEGADOR: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  Accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+}
 
 const BASE = "https://anizone.to"
 
@@ -123,6 +133,18 @@ function itemsDeBusqueda(html: string): Array<{ slug: string; url: string }> {
   }
 }
 
+export async function probarAccesoAniZone(): Promise<number | null> {
+  try {
+    const res = await fetch(`${BASE}/`, {
+      headers: CABECERAS_NAVEGADOR,
+      signal: AbortSignal.timeout(6000),
+    })
+    return res.status
+  } catch {
+    return null
+  }
+}
+
 export async function obtenerSlugAniZone(titulo: string): Promise<string | null> {
   const clave = titulo.trim().toLowerCase()
   if (!clave) return null
@@ -136,7 +158,7 @@ export async function obtenerSlugAniZone(titulo: string): Promise<string | null>
 
   try {
     const resGet = await fetch(urlBusqueda, {
-      headers: { "User-Agent": UA_NAVEGADOR, Accept: "text/html" },
+      headers: CABECERAS_NAVEGADOR,
       signal: AbortSignal.timeout(6000),
     })
     if (!resGet.ok) return null
@@ -165,10 +187,13 @@ export async function obtenerSlugAniZone(titulo: string): Promise<string | null>
     const resPost = await fetch(`${BASE}/livewire/update`, {
       method: "POST",
       headers: {
-        "User-Agent": UA_NAVEGADOR,
+        ...CABECERAS_NAVEGADOR,
         "Content-Type": "application/json",
         Accept: "application/json",
         Referer: urlBusqueda,
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
         "X-Livewire": "v3",
         "X-XSRF-TOKEN": csrf,
         Cookie: cabeceraGalletas(galletas),
@@ -219,7 +244,7 @@ export async function obtenerStreamAniZone(
 
   try {
     const res = await fetch(`${BASE}/anime/${encodeURIComponent(slug)}/${episodio}`, {
-      headers: { "User-Agent": UA_NAVEGADOR, Accept: "text/html" },
+      headers: CABECERAS_NAVEGADOR,
       signal: AbortSignal.timeout(6000),
     })
     if (!res.ok) return null

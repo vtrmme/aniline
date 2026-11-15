@@ -7,7 +7,7 @@ import {
   type StreamServer,
   type SubtitleTrack,
 } from "@/lib/streaming"
-import { obtenerSlugAniZone, obtenerStreamAniZone } from "@/lib/anizone"
+import { obtenerSlugAniZone, obtenerStreamAniZone, probarAccesoAniZone } from "@/lib/anizone"
 import { obtenerSubtituloEspanol } from "@/lib/subdl"
 import { traducirVttAEspanol } from "@/lib/translate"
 import { aVtt } from "@/lib/subtitle-convert"
@@ -178,15 +178,18 @@ export async function GET(req: Request) {
       slug: boolean
       stream: boolean
       subdlKey: boolean
+      estadoAniZone: number | null
     } | null = null
 
     if (rawAnilistId !== null && lang === "sub") {
       const titulo = (anime.title_en || anime.title_es || "").trim()
+      const estadoAniZone = await probarAccesoAniZone()
       debugSubEs = {
         titulo,
         slug: false,
         stream: false,
         subdlKey: !!process.env.SUBDL_API_KEY,
+        estadoAniZone,
       }
       if (titulo) {
         const slugAz = await obtenerSlugAniZone(titulo)

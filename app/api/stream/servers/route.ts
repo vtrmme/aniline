@@ -1,5 +1,5 @@
 import { createServerClient } from "@/lib/supabase"
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import {
   buildServers,
@@ -9,6 +9,8 @@ import {
 } from "@/lib/streaming"
 import { obtenerSlugAniZone, obtenerStreamAniZone } from "@/lib/anizone"
 import { obtenerSubtituloEspanol } from "@/lib/subdl"
+import { traducirVttAEspanol } from "@/lib/translate"
+import { aVtt } from "@/lib/subtitle-convert"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -179,13 +181,45 @@ export async function GET(req: Request) {
           const streamAz = await obtenerStreamAniZone(slugAz, numero)
           if (streamAz) {
             hlsUrls["sub-es"] = `/api/stream/anizone/m3u8?src=${encodeURIComponent(streamAz.m3u8)}`
-            for (const sub of streamAz.subtitulos) {
+
+            const fuenteEn = streamAz.subtitulos.find(
+              (s) => s.idioma.startsWith("en") || /^ingles/i.test(s.titulo)
+            )
+            if (fuenteEn) {
               subtitulos.push({
-                src: `/api/stream/anizone/seg?as=vtt&src=${encodeURIComponent(sub.archivo)}`,
-                label: sub.titulo,
-                lang: sub.idioma,
+                src: `/api/stream/subs/es?src=${encodeURIComponent(fuenteEn.archivo)}`,
+                label: "Español",
+                lang: "es",
+                default: true,
+              })
+              subtitulos.push({
+                src: `/api/stream/anizone/seg?as=vtt&src=${encodeURIComponent(fuenteEn.archivo)}`,
+                label: "Inglés",
+                lang: "en",
+              })
+
+              const archivoEn = fuenteEn.archivo
+              after(async () => {
+                try {
+                  const resSub = await fetch(archivoEn, {
+                    headers: { "User-Agent": "Mozilla/5.0 (compatible; AniLineProxy)" },
+                    signal: AbortSignal.timeout(30000),
+                  })
+                  if (!resSub.ok) return
+                  const crudo = await resSub.text()
+                  const formato = new URL(archivoEn).pathname
+                    .toLowerCase()
+                    .endsWith(".ass")
+                    ? "ass"
+                    : "srt"
+                  const vttEn = aVtt(crudo, formato)
+                  await traducirVttAEspanol(archivoEn, vttEn)
+                } catch {
+                  // el precalentamiento no debe romper la respuesta
+                }
               })
             }
+
             const espanol = await obtenerSubtituloEspanol(titulo, numero)
             if (espanol) {
               subtitulos.unshift({

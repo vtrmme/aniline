@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 
@@ -64,15 +63,26 @@ export function cuerpoDentroDelLimite(req: Request, maximo: number = MAX_CUERPO_
   return Number.isFinite(numero) && numero >= 0 && numero <= maximo
 }
 
-function hashSeguro(valor: string): Buffer {
-  return createHash("sha256").update(valor).digest()
+async function hashSeguro(valor: string): Promise<string> {
+  const datos = new TextEncoder().encode(valor)
+  const digest = await crypto.subtle.digest("SHA-256", datos)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
 }
 
-export function secretosIguales(a: string, b: string): boolean {
-  return timingSafeEqual(hashSeguro(a), hashSeguro(b))
+export async function secretosIguales(a: string, b: string): Promise<boolean> {
+  const hashA = await hashSeguro(a)
+  const hashB = await hashSeguro(b)
+  if (hashA.length !== hashB.length) return false
+  let diferencia = 0
+  for (let i = 0; i < hashA.length; i++) {
+    diferencia |= hashA.charCodeAt(i) ^ hashB.charCodeAt(i)
+  }
+  return diferencia === 0
 }
 
-export function verificarBearerAdmin(req: Request): boolean {
+export async function verificarBearerAdmin(req: Request): Promise<boolean> {
   const esperado = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!esperado || !esperado.trim()) return false
   const auth = req.headers.get("authorization")

@@ -3,6 +3,8 @@ import { rateLimit } from "@/lib/rate-limit"
 import { obtenerIP, usuarioAutenticado, respuestaLimite, noAutorizado, errorInterno } from "@/lib/security"
 import { srcValido, reescribirPlaylist } from "@/lib/hls-proxy"
 
+export const runtime = "edge"
+
 export async function GET(req: Request) {
   const user_id = await usuarioAutenticado(req)
   if (!user_id) {
@@ -31,7 +33,7 @@ export async function GET(req: Request) {
     })
     if (!res.ok) {
       return NextResponse.json(
-        { ok: false, error: "No se pudo obtener el stream" },
+        { ok: false, error: "No se pudo obtener el stream", estado: res.status },
         { status: 502 }
       )
     }

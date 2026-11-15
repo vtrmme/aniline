@@ -5,6 +5,8 @@ import { srcValido } from "@/lib/hls-proxy"
 import { aVtt, esFormatoSubtituloValido } from "@/lib/subtitle-convert"
 import { traducirVttAEspanol } from "@/lib/translate"
 
+export const runtime = "edge"
+
 export async function GET(req: Request) {
   const user_id = await usuarioAutenticado(req)
   if (!user_id) {
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
     })
     if (!res.ok) {
       return NextResponse.json(
-        { ok: false, error: "No se pudo descargar el subtítulo" },
+        { ok: false, error: "No se pudo descargar el subtítulo", estado: res.status },
         { status: 502 }
       )
     }

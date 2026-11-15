@@ -4,6 +4,8 @@ import { obtenerIP, usuarioAutenticado, respuestaLimite, noAutorizado, errorInte
 import { srcValido, reescribirPlaylist } from "@/lib/hls-proxy"
 import { aVtt, esFormatoSubtituloValido } from "@/lib/subtitle-convert"
 
+export const runtime = "edge"
+
 interface ResultadoSrc {
   url: URL | null
   modoVtt: boolean
@@ -59,7 +61,7 @@ export async function GET(req: Request) {
     })
     if (!res.ok || !res.body) {
       return NextResponse.json(
-        { ok: false, error: "No se pudo obtener el recurso" },
+        { ok: false, error: "No se pudo obtener el recurso", estado: res.status },
         { status: 502 }
       )
     }

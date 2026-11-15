@@ -20,7 +20,7 @@ interface CuerpoUpload {
 }
 
 export async function POST(req: Request) {
-  if (!verificarBearerAdmin(req)) {
+  if (!(await verificarBearerAdmin(req))) {
     return NextResponse.json({ ok: false, error: "No autorizado." }, { status: 401 })
   }
 

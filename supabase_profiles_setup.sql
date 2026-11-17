@@ -34,6 +34,10 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'google';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
+-- Asegurar que user_id sea TEXT (el id de Google no es UUID)
+ALTER TABLE public.profiles
+  ALTER COLUMN user_id TYPE TEXT USING user_id::text;
+
 -- Asegurar clave primaria en user_id si no existe
 DO $$
 BEGIN

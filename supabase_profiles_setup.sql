@@ -11,13 +11,39 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Migrar tabla existente que use "id" en lugar de "user_id"
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'id'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'user_id'
+  ) THEN
+    ALTER TABLE public.profiles RENAME COLUMN id TO user_id;
+  END IF;
+END $$;
+
 -- Asegurar columnas si la tabla ya existía sin ellas
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS name TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS image TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'google';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- Asegurar clave primaria en user_id si no existe
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.profiles'::regclass AND contype = 'p'
+  ) THEN
+    ALTER TABLE public.profiles ADD PRIMARY KEY (user_id);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS profiles_email_idx ON profiles (email);
 

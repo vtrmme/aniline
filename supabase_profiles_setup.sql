@@ -34,6 +34,19 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'google';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
+-- Eliminar políticas existentes que puedan depender de user_id (para permitir cambio de tipo)
+DO $$
+DECLARE pol record;
+BEGIN
+  FOR pol IN
+    SELECT policyname
+    FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'profiles'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.profiles', pol.policyname);
+  END LOOP;
+END $$;
+
 -- Asegurar que user_id sea TEXT (el id de Google no es UUID)
 ALTER TABLE public.profiles
   ALTER COLUMN user_id TYPE TEXT USING user_id::text;

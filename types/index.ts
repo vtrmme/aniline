@@ -65,3 +65,13 @@ export interface PerfilStats {
   minutos_vistos: number
   genero_favorito: string
 }
+
+export interface Profile {
+  user_id: string
+  email: string | null
+  name: string | null
+  image: string | null
+  provider: string
+  created_at: string
+  updated_at: string
+}

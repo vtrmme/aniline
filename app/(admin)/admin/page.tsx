@@ -4,7 +4,15 @@ import { useSession } from "next-auth/react"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
 
-
+interface UsuarioItem {
+  user_id: string
+  email: string | null
+  name: string | null
+  image: string | null
+  provider: string
+  created_at: string
+  updated_at: string
+}
 
 interface ActividadItem {
   id: string
@@ -47,12 +55,12 @@ function formatearDuracion(segundos: number | null): string {
 }
 
 export default function AdminPage() {
-
   const { data: session, status } = useSession()
   const userId = (session?.user as { id?: string } | undefined)?.id ?? null
   const email = (session?.user as { email?: string | null } | undefined)?.email ?? null
 
   const [usuarios, setUsuarios] = useState<number | null>(null)
+  const [listaUsuarios, setListaUsuarios] = useState<UsuarioItem[]>([])
   const [actividad, setActividad] = useState<ActividadItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +81,7 @@ export default function AdminPage() {
         const jsonUsuarios = (await respuestaUsuarios.json()) as {
           ok: boolean
           count?: number
+          users?: UsuarioItem[]
         }
         const jsonActividad = (await respuestaActividad.json()) as {
           ok: boolean
@@ -82,10 +91,11 @@ export default function AdminPage() {
           return
         }
         if (!respuestaUsuarios.ok || !jsonUsuarios.ok) {
-          setError("No se pudo cargar la informacion de usuarios.")
+          setError("No se pudo cargar la información de usuarios.")
           return
         }
         setUsuarios(jsonUsuarios.count ?? 0)
+        setListaUsuarios(Array.isArray(jsonUsuarios.users) ? jsonUsuarios.users : [])
         if (jsonActividad.ok && Array.isArray(jsonActividad.items)) {
           setActividad(jsonActividad.items)
         }
@@ -94,7 +104,7 @@ export default function AdminPage() {
         }
       } catch {
         if (!cancelado) {
-          setError("No se pudo cargar la informacion.")
+          setError("No se pudo cargar la información.")
         }
       } finally {
         if (!cancelado) {
@@ -102,6 +112,7 @@ export default function AdminPage() {
         }
       }
     }
+    void cargar()
     const supabase = createClient()
     const canal = supabase
       .channel("admin-sesiones")
@@ -130,7 +141,7 @@ export default function AdminPage() {
   if (status === "unauthenticated" || !session) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-gray-400">
-        Necesitas iniciar sesion para ver esta pagina.
+        Necesitas iniciar sesión para ver esta página.
       </div>
     )
   }
@@ -149,13 +160,13 @@ export default function AdminPage() {
   return (
     <div className="cinema-bg min-h-[calc(100vh-4rem)] pb-16">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-white">Panel de administracion</h1>
+        <h1 className="text-3xl font-bold text-white">Panel de administración</h1>
         <p className="mt-2 text-sm text-gray-400">
-          Registro de actividad de los usuarios y conteo de usuarios registrados.
+          Registro de actividad y usuarios registrados (correo y nombre guardados al iniciar sesión con Google).
         </p>
 
         {loading ? (
-          <p className="mt-8 text-gray-400">Cargando informacion...</p>
+          <p className="mt-8 text-gray-400">Cargando información...</p>
         ) : error ? (
           <p className="mt-8 text-[var(--brand-bright)]">{error}</p>
         ) : (
@@ -177,10 +188,44 @@ export default function AdminPage() {
 
             <div className="glass-panel mt-8 rounded-2xl p-6">
               <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-gray-300">
+                Usuarios registrados
+              </h2>
+              {listaUsuarios.length === 0 ? (
+                <p className="text-sm text-gray-400">Aún no hay perfiles registrados. Los usuarios se guardarán cuando inicien sesión con Google.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-gray-400">
+                        <th className="py-3 pr-4">Nombre</th>
+                        <th className="py-3 pr-4">Correo</th>
+                        <th className="py-3 pr-4">ID</th>
+                        <th className="py-3 pr-4">Registrado</th>
+                        <th className="py-3 pr-4">Último acceso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {listaUsuarios.map((u) => (
+                        <tr key={u.user_id} className="border-b border-white/5">
+                          <td className="py-3 pr-4 text-white">{u.name || "—"}</td>
+                          <td className="py-3 pr-4 text-gray-300">{u.email || "—"}</td>
+                          <td className="py-3 pr-4 font-mono text-xs text-gray-400">{u.user_id}</td>
+                          <td className="py-3 pr-4 text-gray-300">{formatearFecha(u.created_at)}</td>
+                          <td className="py-3 pr-4 text-gray-300">{formatearFecha(u.updated_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="glass-panel mt-8 rounded-2xl p-6">
+              <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-gray-300">
                 Actividad reciente
               </h2>
               {actividad.length === 0 ? (
-                <p className="text-sm text-gray-400">Aun no hay registros de actividad.</p>
+                <p className="text-sm text-gray-400">Aún no hay registros de actividad.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
@@ -191,7 +236,7 @@ export default function AdminPage() {
                         <th className="py-3 pr-4">Episodio</th>
                         <th className="py-3 pr-4">Inicio</th>
                         <th className="py-3 pr-4">Fin</th>
-                        <th className="py-3 pr-4">Duracion</th>
+                        <th className="py-3 pr-4">Duración</th>
                       </tr>
                     </thead>
                     <tbody>

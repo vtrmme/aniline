@@ -4,6 +4,7 @@ import { getToken } from "next-auth/jwt"
 import { NextRequest } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import { obtenerIP, esOwner, respuestaLimite, errorInterno, noAutorizado } from "@/lib/security"
+import type { Profile } from "@/types"
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,34 +24,26 @@ export async function GET(req: NextRequest) {
       return noAutorizado()
     }
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `usuarios:${ip}`, maximo: 30, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `usuarios:${ip}`, maximo: 30, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }
     const supabase = createServerClient()
-    let totalUsuarios = 0
-    let pagina = 1
-    const porPagina = 1000
-    let hayMas = true
-    let guardado = 0
-    while (hayMas && guardado < 10) {
-      const respuesta = await supabase.auth.admin.listUsers({
-        page: pagina,
-        perPage: porPagina,
-      })
-      const datosAdmin = respuesta.data as unknown as { users?: unknown[] } | null
-      const usuariosPagina = (datosAdmin?.users as unknown as {
-        id: string
-        email: string
-      }[]) || []
-      totalUsuarios += usuariosPagina.length
-      if (usuariosPagina.length < porPagina) {
-        hayMas = false
-      }
-      pagina += 1
-      guardado += 1
+    const { data, error, count } = await supabase
+      .from("profiles")
+      .select("user_id,email,name,image,provider,created_at,updated_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error obteniendo perfiles:", error.message)
+      return NextResponse.json(
+        { ok: false, error: "No se pudo cargar la información de usuarios." },
+        { status: 500 }
+      )
     }
-    return NextResponse.json({ ok: true, count: totalUsuarios })
+
+    const profiles = (data || []) as Profile[]
+    return NextResponse.json({ ok: true, count: count ?? profiles.length, users: profiles })
   } catch (err) {
     return errorInterno(err)
   }

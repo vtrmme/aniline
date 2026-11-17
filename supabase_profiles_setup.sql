@@ -47,6 +47,19 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Eliminar claves foráneas en profiles que impidan cambiar el tipo (p. ej. FK a auth.users)
+DO $$
+DECLARE fk record;
+BEGIN
+  FOR fk IN
+    SELECT conname
+    FROM pg_constraint
+    WHERE conrelid = 'public.profiles'::regclass AND contype = 'f'
+  LOOP
+    EXECUTE format('ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS %I', fk.conname);
+  END LOOP;
+END $$;
+
 -- Asegurar que user_id sea TEXT (el id de Google no es UUID)
 ALTER TABLE public.profiles
   ALTER COLUMN user_id TYPE TEXT USING user_id::text;

@@ -176,7 +176,22 @@ export function EpisodePlayer({
         video.src = currentSrc
         startPlyr()
       } else if (Hls.isSupported()) {
-        hls = new Hls()
+        hls = new Hls({
+          enableWorker: true,
+          backBufferLength: 90,
+        })
+        let recuperacionesMedia = 0
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (!data.fatal || !hls) return
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad()
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && recuperacionesMedia < 2) {
+            recuperacionesMedia += 1
+            hls.recoverMediaError()
+          } else {
+            hls.destroy()
+          }
+        })
         hls.loadSource(currentSrc)
         hls.attachMedia(video)
         hls.on(Hls.Events.MANIFEST_PARSED, startPlyr)

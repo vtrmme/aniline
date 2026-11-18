@@ -19,7 +19,7 @@ interface EntradaCache<T> {
 }
 
 const CADUCIDAD_SLUG_MS = 6 * 60 * 60 * 1000
-const CADUCIDAD_STREAM_MS = 30 * 60 * 1000
+const CADUCIDAD_STREAM_MS = 10 * 60 * 1000
 
 const cacheSlugs = new Map<string, EntradaCache<string>>()
 const cacheStreams = new Map<string, EntradaCache<StreamAniZone>>()

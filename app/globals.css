@@ -239,3 +239,48 @@
       );
   }
 }
+
+/* Plyr: controles visibles en reproductor */
+.plyr {
+  --plyr-color-main: var(--brand);
+  --plyr-video-background: #000;
+  --plyr-video-control-color: #fff;
+  --plyr-video-control-color-hover: #fff;
+  --plyr-video-control-background-hover: var(--brand);
+  --plyr-audio-control-color: #fff;
+  --plyr-audio-control-background-hover: var(--brand);
+  --plyr-menu-background: rgba(30, 31, 34, 0.98);
+  --plyr-menu-color: #f5f5f6;
+  --plyr-menu-border-color: rgba(255, 255, 255, 0.12);
+  --plyr-menu-arrow-color: #9ca3af;
+  --plyr-tooltip-background: rgba(20, 21, 23, 0.96);
+  --plyr-tooltip-color: #fff;
+  --plyr-badge-background: var(--brand);
+  --plyr-badge-text-color: #fff;
+  --plyr-tab-focus-color: var(--brand-bright);
+  --plyr-range-thumb-background: #fff;
+  --plyr-range-fill-background: var(--brand);
+  --plyr-progress-loading-background: rgba(255, 255, 255, 0.25);
+  --plyr-video-controls-background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75));
+}
+
+.plyr--video .plyr__controls {
+  color: #fff;
+}
+
+.plyr__control {
+  color: #fff;
+}
+
+.plyr__control svg {
+  fill: currentColor;
+}
+
+.plyr__control--overlaid {
+  background: var(--brand) !important;
+  color: #fff !important;
+}
+
+.plyr__control--overlaid svg {
+  fill: #fff;
+}

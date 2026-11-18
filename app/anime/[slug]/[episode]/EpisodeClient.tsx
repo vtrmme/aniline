@@ -42,9 +42,8 @@ export default function EpisodePage({
   const [prevEpisodeNum, setPrevEpisodeNum] = useState<number | null>(null)
   const [episodesList, setEpisodesList] = useState<{ numero: number; title_es?: string | null }[]>([])
   const [loading, setLoading] = useState(true)
-  const [streamData, setStreamData] = useState<StreamData | null>(null)
+  const [streamResult, setStreamResult] = useState<{ key: string; data: StreamData | null } | null>(null)
   const [streamLang, setStreamLang] = useState<StreamLang>("sub")
-  const [serversLoading, setServersLoading] = useState(true)
 
   const [slug, setSlug] = useState<string | null>(null)
   const [num, setNum] = useState<number | null>(null)
@@ -189,45 +188,47 @@ export default function EpisodePage({
     fetchData()
   }, [slug, num, lang, userId])
 
-  useEffect(() => {
-    setStreamData(null)
-  }, [slug, num])
+  const requestKey = slug && num !== null ? `${slug}:${num}:${streamLang}` : null
+  const serversLoading = requestKey !== null && streamResult?.key !== requestKey
+  const streamData = requestKey !== null && streamResult?.key === requestKey ? streamResult.data : null
 
   useEffect(() => {
-    if (!slug || num === null) return
+    if (!requestKey || !slug || num === null) return
     let cancelled = false
-    setServersLoading(true)
 
     const fetchServers = async () => {
+      let data: StreamData | null = null
       try {
         const res = await fetch(
           `/api/stream/servers?slug=${encodeURIComponent(slug)}&episode=${num}&lang=${streamLang}`
         )
-        if (!res.ok) return
-        const json = (await res.json()) as {
-          ok: boolean
-          servers?: StreamServerInfo[]
-          anilistId?: number | null
-          nativeUrl?: string | null
-          youtubeUrl?: string | null
-          hlsUrl?: string | null
-          hlsUrls?: Record<string, string>
-          subtitles?: SubtitleTrackInfo[]
+        if (res.ok) {
+          const json = (await res.json()) as {
+            ok: boolean
+            servers?: StreamServerInfo[]
+            anilistId?: number | null
+            nativeUrl?: string | null
+            youtubeUrl?: string | null
+            hlsUrl?: string | null
+            hlsUrls?: Record<string, string>
+            subtitles?: SubtitleTrackInfo[]
+          }
+          if (!cancelled && json.ok && Array.isArray(json.servers)) {
+            data = {
+              servers: json.servers,
+              anilistId: typeof json.anilistId === "number" ? json.anilistId : null,
+              nativeUrl: json.nativeUrl || null,
+              youtubeUrl: json.youtubeUrl || null,
+              hlsUrl: json.hlsUrl || null,
+              hlsUrls: json.hlsUrls || {},
+              subtitles: Array.isArray(json.subtitles) ? json.subtitles : [],
+            }
+          }
         }
-        if (cancelled || !json.ok || !Array.isArray(json.servers)) return
-        setStreamData({
-          servers: json.servers,
-          anilistId: typeof json.anilistId === "number" ? json.anilistId : null,
-          nativeUrl: json.nativeUrl || null,
-          youtubeUrl: json.youtubeUrl || null,
-          hlsUrl: json.hlsUrl || null,
-          hlsUrls: json.hlsUrls || {},
-          subtitles: Array.isArray(json.subtitles) ? json.subtitles : [],
-        })
       } catch {
         // sin red: se mantiene el reproductor local
       } finally {
-        if (!cancelled) setServersLoading(false)
+        if (!cancelled) setStreamResult({ key: requestKey, data })
       }
     }
 
@@ -235,7 +236,7 @@ export default function EpisodePage({
     return () => {
       cancelled = true
     }
-  }, [slug, num, streamLang, lang])
+  }, [requestKey, slug, num, streamLang, lang])
 
   const registrarSesion = useCallback(
     async (segundos: number, finalizar: boolean) => {

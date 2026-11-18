@@ -88,15 +88,32 @@ export function EpisodePlayer({
 
   const storedServerId = useMemo(() => loadStoredServer(storageKey), [storageKey])
 
+  const getSrcFor = useCallback(
+    (server: StreamServerInfo): string | null => {
+      if (server.kind === "native") return nativeUrl
+      if (server.kind === "hls") {
+        const propia = hlsUrls?.[server.id]
+        return typeof propia === "string" ? propia : hlsUrl
+      }
+      if (server.kind === "youtube") return youtubeUrl
+      if (server.kind === "embed" && anilistId !== null) {
+        return getEmbedUrlById(server.id, anilistId, episode, lang)
+      }
+      return null
+    },
+    [nativeUrl, hlsUrl, hlsUrls, youtubeUrl, anilistId, episode, lang]
+  )
+
   const selected = useMemo(() => {
     if (servers.length === 0) return null
     const preferred = manualId ?? storedServerId
     if (preferred) {
       const match = servers.find((s) => s.id === preferred)
-      if (match) return match
+      if (match && getSrcFor(match)) return match
     }
-    return servers[0]
-  }, [servers, manualId, storedServerId])
+    const primeroValido = servers.find((s) => getSrcFor(s))
+    return primeroValido || servers[0]
+  }, [servers, manualId, storedServerId, getSrcFor])
 
   const handleSelect = useCallback(
     (id: string) => {
@@ -117,19 +134,8 @@ export function EpisodePlayer({
     onMarkWatchedRef.current?.()
   }, [])
 
-  const currentSrc = useMemo(() => {
-    if (!selected) return null
-    if (selected.kind === "native") return nativeUrl
-    if (selected.kind === "hls") {
-      const propia = hlsUrls?.[selected.id]
-      return typeof propia === "string" ? propia : hlsUrl
-    }
-    if (selected.kind === "youtube") return youtubeUrl
-    if (selected.kind === "embed" && anilistId !== null) {
-      return getEmbedUrlById(selected.id, anilistId, episode, lang)
-    }
-    return null
-  }, [selected, nativeUrl, hlsUrl, hlsUrls, youtubeUrl, anilistId, episode, lang])
+  const currentSrc = useMemo(() => (selected ? getSrcFor(selected) : null), [selected, getSrcFor])
+  const anyAvailable = useMemo(() => servers.some((s) => !!getSrcFor(s)), [servers, getSrcFor])
 
   const pistas = useMemo(() => {
     if (!selected) return []
@@ -291,7 +297,14 @@ export function EpisodePlayer({
   if (!selected || !currentSrc) {
     return (
       <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl aspect-video w-full flex items-center justify-center">
-        <p className="text-gray-400 text-center p-8">{labels.notAvailable}</p>
+        {anyAvailable ? (
+          <div className="flex flex-col items-center gap-3 text-gray-400">
+            <div className="h-10 w-10 animate-pulse rounded-full bg-[var(--surface)]" />
+            <p className="text-sm">Cargando reproductor...</p>
+          </div>
+        ) : (
+          <p className="text-gray-400 text-center p-8">{labels.notAvailable}</p>
+        )}
       </div>
     )
   }

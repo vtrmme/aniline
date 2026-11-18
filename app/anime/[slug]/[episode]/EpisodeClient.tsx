@@ -329,7 +329,8 @@ export default function EpisodePage({
     lang === "es" ? episodeData.title_es : episodeData.title_en || episodeData.title_es || `Episodio ${episodeData.numero}`
   const sinopsis = lang === "es" ? anime.sinopsis_es : anime.sinopsis_en || anime.sinopsis_es
 
-  const hasSource = !!streamData || !!videoUrl || !!youtubeUrl
+  const hasPlayableStream = !!(streamData && streamData.servers.length > 0)
+  const hasSource = hasPlayableStream || !!videoUrl || !!youtubeUrl
   const showPlayerLoading = !hasSource && serversLoading
   const showUnavailable = !hasSource && !serversLoading
 
@@ -379,7 +380,7 @@ export default function EpisodePage({
             )}
 
             <div className="overflow-hidden rounded-xl bg-black shadow-[var(--shadow-elevated)] ring-1 ring-white/10">
-              {streamData && streamData.servers.length > 0 ? (
+              {hasPlayableStream && streamData ? (
                 <EpisodePlayer
                   key={`${anime.slug}:${episodeData.numero}`}
                   servers={streamData.servers}
@@ -401,7 +402,7 @@ export default function EpisodePage({
                     sub: t(lang, "serverSub"),
                     dub: t(lang, "serverDub"),
                     notAvailable: t(lang, "episodeNotAvailable"),
-                    invalidYoutube: "URL de YouTube inv├ílida",
+                    invalidYoutube: "URL de YouTube inválida",
                     noServers: t(lang, "serverNoServers"),
                   }}
                 />

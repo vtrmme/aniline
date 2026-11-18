@@ -156,15 +156,27 @@ async function resolverControlado(
   const [subdl, anizone] = await Promise.all([subdlPromise, anizonePromise])
 
   const subtitles: SubtitleTrack[] = []
-  if (subdl) {
-    subtitles.push(subdl)
+  const esNativa = pistaAniZoneEspañol(anizone.subs)
+  const auto = esNativa ? null : pistaAniZoneTraducida(anizone.subs)
+  const subAniZone = esNativa || auto
+
+  if (anizone.m3u8) {
+    // Priorizar subtitulos de la misma fuente que el video para mantener sincronizacion
+    if (subAniZone) {
+      subtitles.push(subAniZone)
+    }
+    if (subdl) {
+      subtitles.push({
+        ...subdl,
+        label: "Español (SubDL)",
+        default: subtitles.length === 0,
+      })
+    }
   } else {
-    const esNativa = pistaAniZoneEspañol(anizone.subs)
-    if (esNativa) {
-      subtitles.push(esNativa)
-    } else {
-      const auto = pistaAniZoneTraducida(anizone.subs)
-      if (auto) subtitles.push(auto)
+    if (subdl) {
+      subtitles.push(subdl)
+    } else if (subAniZone) {
+      subtitles.push(subAniZone)
     }
   }
 

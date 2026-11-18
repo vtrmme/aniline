@@ -5,7 +5,10 @@ import {
   buildServers,
   type StreamLang,
   type StreamServer,
+  type SubtitleTrack,
 } from "@/lib/streaming"
+import { obtenerSubtituloEspanol } from "@/lib/subdl"
+import { obtenerSlugAniZone, obtenerStreamAniZone, type SubtituloAniZone } from "@/lib/anizone"
 import {
   obtenerIP,
   usuarioAutenticado,
@@ -17,6 +20,7 @@ import {
 } from "@/lib/security"
 
 const BUCKET = "episode-videos"
+const ID_ANIZONE = "aniline-hls"
 
 interface ServerDescriptor {
   id: string
@@ -24,11 +28,35 @@ interface ServerDescriptor {
   kind: StreamServer["kind"]
 }
 
+interface ResultadoControlado {
+  hlsUrl: string | null
+  subtitles: SubtitleTrack[]
+}
+
 function parseLang(value: string | null): StreamLang {
   return value === "dub" ? "dub" : "sub"
 }
 
-async function resolveHls(
+function idiomaEsEspanol(idioma: string): boolean {
+  const limpio = idioma.trim().toLowerCase()
+  return (
+    limpio === "es" ||
+    limpio === "spa" ||
+    limpio.startsWith("es-") ||
+    limpio.startsWith("es_") ||
+    limpio.includes("spanish") ||
+    limpio.includes("espa")
+  )
+}
+
+function titulosBusqueda(titleEs: unknown, titleEn: unknown): string[] {
+  const lista = [titleEn, titleEs]
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    .map((v) => v.trim())
+  return Array.from(new Set(lista))
+}
+
+async function resolveHlsExterno(
   anilistId: number,
   episode: number,
   lang: StreamLang
@@ -57,6 +85,96 @@ async function resolveHls(
   }
 }
 
+async function buscarSubtituloSubdl(
+  titulos: string[],
+  numero: number
+): Promise<SubtitleTrack | null> {
+  for (const titulo of titulos) {
+    try {
+      const sub = await obtenerSubtituloEspanol(titulo, numero)
+      if (sub) {
+        return {
+          src: `/api/stream/subs/vtt?u=${encodeURIComponent(sub.url)}&f=${encodeURIComponent(sub.formato)}`,
+          label: "Español",
+          lang: "es",
+          default: true,
+        }
+      }
+    } catch {
+      // continuar con el siguiente titulo
+    }
+  }
+  return null
+}
+
+function pistaAniZoneEspañol(subs: SubtituloAniZone[]): SubtitleTrack | null {
+  const es = subs.find((s) => idiomaEsEspanol(s.idioma))
+  if (!es) return null
+  return {
+    src: `/api/stream/anizone/seg?src=${encodeURIComponent(es.archivo)}&as=vtt`,
+    label: "Español",
+    lang: "es",
+    default: true,
+  }
+}
+
+function pistaAniZoneTraducida(subs: SubtituloAniZone[]): SubtitleTrack | null {
+  if (subs.length === 0) return null
+  const preferido =
+    subs.find((s) => s.idioma.startsWith("en")) ||
+    subs.find((s) => !idiomaEsEspanol(s.idioma)) ||
+    subs[0]
+  return {
+    src: `/api/stream/subs/es?src=${encodeURIComponent(preferido.archivo)}`,
+    label: "Español (auto)",
+    lang: "es",
+    default: true,
+  }
+}
+
+async function resolverControlado(
+  titulos: string[],
+  numero: number
+): Promise<ResultadoControlado> {
+  const subdlPromise = buscarSubtituloSubdl(titulos, numero)
+  const anizonePromise = (async (): Promise<{ m3u8: string | null; subs: SubtituloAniZone[] }> => {
+    for (const titulo of titulos) {
+      try {
+        const { slug } = await obtenerSlugAniZone(titulo)
+        if (!slug) continue
+        const stream = await obtenerStreamAniZone(slug, numero)
+        if (stream && stream.m3u8) {
+          return { m3u8: stream.m3u8, subs: stream.subtitulos }
+        }
+      } catch {
+        // probar siguiente titulo
+      }
+    }
+    return { m3u8: null, subs: [] }
+  })()
+
+  const [subdl, anizone] = await Promise.all([subdlPromise, anizonePromise])
+
+  const subtitles: SubtitleTrack[] = []
+  if (subdl) {
+    subtitles.push(subdl)
+  } else {
+    const esNativa = pistaAniZoneEspañol(anizone.subs)
+    if (esNativa) {
+      subtitles.push(esNativa)
+    } else {
+      const auto = pistaAniZoneTraducida(anizone.subs)
+      if (auto) subtitles.push(auto)
+    }
+  }
+
+  const hlsUrl = anizone.m3u8
+    ? `/api/stream/anizone/m3u8?src=${encodeURIComponent(anizone.m3u8)}`
+    : null
+
+  return { hlsUrl, subtitles }
+}
+
 export async function GET(req: Request) {
   const user_id = await usuarioAutenticado(req)
   if (!user_id) {
@@ -64,7 +182,7 @@ export async function GET(req: Request) {
   }
 
   const ip = obtenerIP(req)
-  const limite = rateLimit({ clave: `stream:${ip}`, maximo: 60, ventanaSegundos: 60 })
+  const limite = await rateLimit({ clave: `stream:${ip}`, maximo: 60, ventanaSegundos: 60 })
   if (!limite.permitido) {
     return respuestaLimite()
   }
@@ -77,21 +195,21 @@ export async function GET(req: Request) {
 
     if (!slug || !episodeParam) {
       return NextResponse.json(
-        { ok: false, error: "Faltan parámetros: slug, episode" },
+        { ok: false, error: "Faltan parametros: slug, episode" },
         { status: 400 }
       )
     }
 
     if (!esSlugSeguro(slug)) {
       return NextResponse.json(
-        { ok: false, error: "slug inválido" },
+        { ok: false, error: "slug invalido" },
         { status: 400 }
       )
     }
 
     if (!esEnteroEnRango(Number(episodeParam), 1, 100000)) {
       return NextResponse.json(
-        { ok: false, error: "Número de episodio inválido" },
+        { ok: false, error: "Numero de episodio invalido" },
         { status: 400 }
       )
     }
@@ -134,12 +252,6 @@ export async function GET(req: Request) {
     const hasNativeVideo = !!episode.video_url
     const hasYoutube = !!episode.youtube_url
 
-    const servers = buildServers({
-      anilistId: rawAnilistId,
-      hasNativeVideo,
-      hasYoutube,
-    })
-
     let nativeUrl: string | null = null
     if (hasNativeVideo && episode.video_url) {
       const { data: signed, error: signError } = await supabase.storage
@@ -150,20 +262,54 @@ export async function GET(req: Request) {
       }
     }
 
-    let hlsUrl: string | null = null
-    if (rawAnilistId !== null) {
-      hlsUrl = await resolveHls(rawAnilistId, numero, lang)
+    const titulos = titulosBusqueda(anime.title_es, anime.title_en)
+    const controlado = await resolverControlado(titulos, numero)
+    const hlsUrls: Record<string, string> = {}
+
+    if (controlado.hlsUrl) {
+      hlsUrls[ID_ANIZONE] = controlado.hlsUrl
     }
 
-    const descriptors: ServerDescriptor[] = servers.map((s) => ({
+    let hlsExterno: string | null = null
+    if (!controlado.hlsUrl && rawAnilistId !== null) {
+      hlsExterno = await resolveHlsExterno(rawAnilistId, numero, lang)
+      if (hlsExterno) {
+        hlsUrls.hls = hlsExterno
+      }
+    }
+
+    const baseServers = buildServers({
+      anilistId: rawAnilistId,
+      hasNativeVideo,
+      hasYoutube,
+    })
+    const baseDescriptors: ServerDescriptor[] = baseServers.map((s) => ({
       id: s.id,
       name: s.name,
       kind: s.kind,
     }))
 
-    if (hlsUrl) {
-      descriptors.unshift({ id: "hls", name: "HD", kind: "hls" })
+    const hlsServers: ServerDescriptor[] = []
+    if (controlado.hlsUrl) {
+      hlsServers.push({ id: ID_ANIZONE, name: "AniLine HD", kind: "hls" })
+    } else if (hlsExterno) {
+      hlsServers.push({ id: "hls", name: "HD", kind: "hls" })
     }
+
+    const tieneFuenteControlada =
+      !!controlado.hlsUrl ||
+      !!nativeUrl ||
+      (hlsExterno !== null && controlado.subtitles.length > 0)
+
+    const nativos = baseDescriptors.filter((s) => s.kind === "native")
+    const embeds = baseDescriptors.filter((s) => s.kind === "embed")
+    const youtube = baseDescriptors.filter((s) => s.kind === "youtube")
+
+    const descriptors: ServerDescriptor[] = tieneFuenteControlada
+      ? [...hlsServers, ...nativos, ...youtube, ...embeds]
+      : [...hlsServers, ...nativos, ...embeds, ...youtube]
+
+    const hlsPrincipal = controlado.hlsUrl || hlsExterno
 
     return NextResponse.json({
       ok: true,
@@ -171,7 +317,9 @@ export async function GET(req: Request) {
       servers: descriptors,
       nativeUrl,
       youtubeUrl: episode.youtube_url || null,
-      hlsUrl,
+      hlsUrl: hlsPrincipal,
+      hlsUrls,
+      subtitles: controlado.subtitles,
     })
   } catch (err) {
     return errorInterno(err)

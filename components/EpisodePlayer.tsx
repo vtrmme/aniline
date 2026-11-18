@@ -133,7 +133,10 @@ export function EpisodePlayer({
 
   const pistas = useMemo(() => {
     if (!selected) return []
-    return selected.kind === "hls" && Array.isArray(subtitles) ? subtitles : []
+    if ((selected.kind === "hls" || selected.kind === "native") && Array.isArray(subtitles)) {
+      return subtitles
+    }
+    return []
   }, [selected, subtitles])
 
   useEffect(() => {
@@ -349,6 +352,11 @@ export function EpisodePlayer({
           <span className="absolute top-2 right-2 text-[10px] uppercase tracking-wider bg-black/60 text-gray-300 rounded px-1.5 py-0.5">
             {lang === "sub" ? labels.sub : labels.dub}
           </span>
+        )}
+        {selected.kind === "embed" && (
+          <div className="pointer-events-none absolute bottom-2 left-2 right-2 rounded bg-black/70 px-2 py-1 text-[11px] text-amber-300">
+            Los subtítulos dependen del servidor externo y pueden no estar en español.
+          </div>
         )}
       </div>
 

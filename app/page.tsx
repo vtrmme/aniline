@@ -117,8 +117,12 @@ function HomeContent() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarFacetas()
+  }, [cargarFacetas])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarAnimes()
-  }, [cargarFacetas, cargarAnimes])
+  }, [cargarAnimes])
 
   const totalPaginas = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE))
 

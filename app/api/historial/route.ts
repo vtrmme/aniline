@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     }
 
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `historial:${ip}`, maximo: 120, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `historial:${ip}`, maximo: 120, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }
@@ -134,7 +134,7 @@ export async function POST(req: Request) {
     }
 
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `historial-post:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `historial-post:${ip}`, maximo: 60, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }

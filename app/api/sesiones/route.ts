@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       return noAutorizado()
     }
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `sesiones:${ip}`, maximo: 120, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `sesiones:${ip}`, maximo: 120, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 })
     }
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `sesiones:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `sesiones:${ip}`, maximo: 60, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }

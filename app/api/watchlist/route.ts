@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `watchlist:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `watchlist:${ip}`, maximo: 60, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }
@@ -154,7 +154,7 @@ export async function DELETE(req: Request) {
     }
 
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `watchlist:${ip}`, maximo: 60, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `watchlist:${ip}`, maximo: 60, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }
@@ -206,7 +206,7 @@ export async function GET(req: Request) {
     }
 
     const ip = obtenerIP(req)
-    const limite = rateLimit({ clave: `watchlist:${ip}`, maximo: 120, ventanaSegundos: 60 })
+    const limite = await rateLimit({ clave: `watchlist:${ip}`, maximo: 120, ventanaSegundos: 60 })
     if (!limite.permitido) {
       return respuestaLimite()
     }

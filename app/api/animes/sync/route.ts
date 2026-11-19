@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   }
 
   const ip = obtenerIP(req)
-  const limite = rateLimit({ clave: `sync:${ip}`, maximo: 2, ventanaSegundos: 3600 })
+  const limite = await rateLimit({ clave: `sync:${ip}`, maximo: 2, ventanaSegundos: 3600 })
   if (!limite.permitido) {
     return respuestaLimite()
   }

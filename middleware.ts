@@ -2,7 +2,7 @@ import { withAuth } from "next-auth/middleware"
 import { NextResponse, type NextRequest } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 
-const UA_MALICIOSOS = [
+const UA_MALICIOSOS: string[] = [
   "sqlmap",
   "nikto",
   "nmap",
@@ -21,10 +21,6 @@ const UA_MALICIOSOS = [
   "w3af",
   "netsparker",
   "burp suite",
-  "w3af",
-  "havij",
-  "domino",
-  "netsparker",
 ]
 
 function ipDe(req: NextRequest): string {
@@ -55,7 +51,7 @@ function construirCsp(): string {
   ].join("; ")
 }
 
-function capaSeguridad(req: NextRequest): NextResponse | null {
+async function capaSeguridad(req: NextRequest): Promise<NextResponse | null> {
   const response = NextResponse.next()
   response.headers.set("Content-Security-Policy", construirCsp())
   response.headers.set("X-Content-Type-Options", "nosniff")
@@ -89,7 +85,7 @@ function capaSeguridad(req: NextRequest): NextResponse | null {
 
   const esApi = req.nextUrl.pathname.startsWith("/api")
   const limiteMaximo = esApi ? 120 : 300
-  const limite = rateLimit({
+  const limite = await rateLimit({
     clave: `global:${ipDe(req)}`,
     maximo: limiteMaximo,
     ventanaSegundos: 60,
@@ -105,8 +101,9 @@ function capaSeguridad(req: NextRequest): NextResponse | null {
 }
 
 export default withAuth(
-  function middleware(req: NextRequest) {
-    return capaSeguridad(req) ?? NextResponse.next()
+  async function middleware(req: NextRequest): Promise<NextResponse> {
+    const respuesta = await capaSeguridad(req)
+    return respuesta ?? NextResponse.next()
   },
   {
     callbacks: {

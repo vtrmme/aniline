@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   }
 
   const ip = obtenerIP(req)
-  const limite = rateLimit({ clave: `subes:${ip}`, maximo: 30, ventanaSegundos: 60 })
+  const limite = await rateLimit({ clave: `subes:${ip}`, maximo: 30, ventanaSegundos: 60 })
   if (!limite.permitido) {
     return respuestaLimite()
   }

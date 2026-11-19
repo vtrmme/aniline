@@ -61,7 +61,7 @@ export default function EpisodePage({
     return () => {
       cancelled = true
     }
-  }, [lang])
+  }, [params])
 
   useEffect(() => {
     if (!slug || num === null) return
@@ -114,13 +114,15 @@ export default function EpisodePage({
           setYoutubeUrl(null)
         }
 
+        let segundosIniciales = 0
         if (userId) {
           const res = await fetch(`/api/historial?anime_id=${animeData.id}&episodio_numero=${num}`)
           if (res.ok) {
             const json = await res.json()
             if (json.inList) {
               setHistorialItem({ episodio_numero: json.episodio_numero })
-              setSavedSeconds(typeof json.segundos === "number" ? json.segundos : 0)
+              segundosIniciales = typeof json.segundos === "number" ? json.segundos : 0
+              setSavedSeconds(segundosIniciales)
             }
           }
 
@@ -136,7 +138,7 @@ export default function EpisodePage({
             body: JSON.stringify({
               anime_id: animeData.id,
               episodio_numero: num,
-              segundos: savedSeconds,
+              segundos: segundosIniciales,
               finalizar: false,
             }),
           })
@@ -186,7 +188,7 @@ export default function EpisodePage({
     }
 
     fetchData()
-  }, [slug, num, lang, userId])
+  }, [slug, num, userId])
 
   const requestKey = slug && num !== null ? `${slug}:${num}:${streamLang}` : null
   const serversLoading = requestKey !== null && streamResult?.key !== requestKey
@@ -236,7 +238,7 @@ export default function EpisodePage({
     return () => {
       cancelled = true
     }
-  }, [requestKey, slug, num, streamLang, lang])
+  }, [requestKey, slug, num, streamLang])
 
   const registrarSesion = useCallback(
     async (segundos: number, finalizar: boolean) => {

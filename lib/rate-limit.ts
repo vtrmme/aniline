@@ -3,6 +3,17 @@ interface RateLimitEntry {
   resetTime: number
 }
 
+export interface RateLimitResult {
+  permitido: boolean
+  restante: number
+}
+
+interface RateLimitParams {
+  clave: string
+  maximo?: number
+  ventanaSegundos?: number
+}
+
 const store = new Map<string, RateLimitEntry>()
 
 const LIMPIEZA_INTERVALO_MS = 60_000
@@ -17,22 +28,21 @@ function limpiarExpiradas(): void {
   }
 }
 
-setInterval(() => {
-  limpiarExpiradas()
-  if (store.size > MAX_ENTRADAS) {
-    store.clear()
-  }
-}, LIMPIEZA_INTERVALO_MS)
+const intervalo: ReturnType<typeof setInterval> | null =
+  typeof setInterval === "function"
+    ? setInterval(() => {
+        limpiarExpiradas()
+        if (store.size > MAX_ENTRADAS) {
+          store.clear()
+        }
+      }, LIMPIEZA_INTERVALO_MS)
+    : null
 
-export function rateLimit({
-  clave,
-  maximo = 10,
-  ventanaSegundos = 60,
-}: {
-  clave: string
-  maximo?: number
-  ventanaSegundos?: number
-}): { permitido: boolean; restante: number } {
+if (intervalo && typeof (intervalo as { unref?: () => void }).unref === "function") {
+  ;(intervalo as { unref: () => void }).unref()
+}
+
+function rateLimitLocal({ clave, maximo = 10, ventanaSegundos = 60 }: RateLimitParams): RateLimitResult {
   const ahora = Date.now()
   const entrada = store.get(clave)
 
@@ -51,4 +61,47 @@ export function rateLimit({
   entrada.count++
   store.set(clave, entrada)
   return { permitido: true, restante: maximo - entrada.count }
+}
+
+async function rateLimitUpstash({
+  clave,
+  maximo = 10,
+  ventanaSegundos = 60,
+}: RateLimitParams): Promise<RateLimitResult | null> {
+  const url: string | undefined = process.env.UPSTASH_REDIS_REST_URL
+  const token: string | undefined = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return null
+
+  try {
+    const key: string = `rl:${clave}:${Math.floor(Date.now() / (ventanaSegundos * 1000))}`
+    const endpoint: string = `${url.replace(/\/$/, "")}/pipeline`
+    const res: Response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([
+        ["INCR", key],
+        ["EXPIRE", key, ventanaSegundos + 5],
+      ]),
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as Array<{ result?: unknown; error?: string }>
+    const countRaw = json?.[0]?.result
+    const count: number = typeof countRaw === "number" ? countRaw : Number(countRaw)
+    if (!Number.isFinite(count)) return null
+    const permitido: boolean = count <= maximo
+    const restante: number = Math.max(0, maximo - count)
+    return { permitido, restante }
+  } catch {
+    return null
+  }
+}
+
+export async function rateLimit(params: RateLimitParams): Promise<RateLimitResult> {
+  const remoto: RateLimitResult | null = await rateLimitUpstash(params)
+  if (remoto) return remoto
+  return rateLimitLocal(params)
 }

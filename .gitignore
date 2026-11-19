@@ -49,3 +49,13 @@ android-twa/twa-manifest.json.bak
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Android / twa
+*.jks
+*.keystore
+*.keystore.properties
+android-twa/build/
+android-twa/app/build/
+android-twa/.gradle/
+android-twa/local.properties
+android-twa/twa-manifest.json.bak
+android-twa/keystore-credentials.txt

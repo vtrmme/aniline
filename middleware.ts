@@ -67,9 +67,14 @@ async function capaSeguridad(req: NextRequest): Promise<NextResponse | null> {
   )
   response.headers.set("X-Permitted-Cross-Domain-Policies", "none")
 
-  const esRecursoEstatico = /\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|txt|xml|json|js|mjs|css|map)$/i.test(
-    req.nextUrl.pathname
-  )
+  const esWellKnown = req.nextUrl.pathname.startsWith("/.well-known/")
+  const esRecursoEstatico =
+    /\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|eot|txt|xml|json|js|mjs|css|map|webmanifest)$/i.test(
+      req.nextUrl.pathname
+    ) ||
+    req.nextUrl.pathname === "/sw.js" ||
+    req.nextUrl.pathname === "/manifest.webmanifest" ||
+    esWellKnown
   if (esRecursoEstatico) {
     return response
   }

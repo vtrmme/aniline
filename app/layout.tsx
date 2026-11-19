@@ -1,8 +1,9 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Plus_Jakarta_Sans, Outfit } from "next/font/google"
 import "./globals.css"
 import { Navbar } from "@/components/Navbar"
 import { DiscordFloatingButton } from "@/components/DiscordFloatingButton"
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister"
 import { Providers } from "@/app/providers"
 import { LanguageProvider } from "@/contexts/LanguageContext"
 import { getSiteUrl, siteConfig } from "@/lib/site"
@@ -21,6 +22,13 @@ const outfit = Outfit({
 
 const siteUrl: string = getSiteUrl()
 
+export const viewport: Viewport = {
+  themeColor: "#0B0C0E",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+}
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -30,10 +38,19 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   applicationName: siteConfig.name,
   manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: siteConfig.name,
+  },
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
     shortcut: ["/icon.svg"],
-    apple: [{ url: "/aniline-logo.png" }],
+    apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },
   openGraph: {
     title: `${siteConfig.name} - Anime Streaming Gratis`,
@@ -67,6 +84,7 @@ export default function RootLayout({
             <Navbar />
             <main className="pt-16 min-h-screen">{children}</main>
             <DiscordFloatingButton />
+            <ServiceWorkerRegister />
           </Providers>
         </LanguageProvider>
       </body>

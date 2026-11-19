@@ -139,6 +139,10 @@ export const translations = {
     supportFaqQ5: "¿Puedo cambiar de tier?",
     supportFaqA5: "Sí, sube o baja de tier desde Patreon en cualquier momento; se ajusta al siguiente ciclo de facturación.",
     supportDiscordNote: "El Discord de AniLine abrirá pronto. Los roles por tier se asignan automáticamente al conectar tu cuenta de Patreon con Discord.",
+    navDownloadApp: "Descargar app",
+    downloadAppTitle: "Descarga AniLine para Android",
+    downloadAppSubtitle: "Instala el APK y úsala como app. Si Android lo bloquea, permite instalar desde orígenes desconocidos.",
+    downloadAppUnavailable: "Descarga no disponible por ahora",
   },
   en: {
     siteName: "AniLine",
@@ -278,6 +282,10 @@ export const translations = {
     supportFaqQ5: "Can I change tiers?",
     supportFaqA5: "Yes, you can move up or down a tier from Patreon at any time; it applies on the next billing cycle.",
     supportDiscordNote: "The AniLine Discord will open soon. Tier roles are assigned automatically when you connect your Patreon account to Discord.",
+    navDownloadApp: "Download app",
+    downloadAppTitle: "Download AniLine for Android",
+    downloadAppSubtitle: "Install the APK and use it like an app. If Android blocks it, allow installs from unknown sources.",
+    downloadAppUnavailable: "Download not available yet",
   },
 } as const
 

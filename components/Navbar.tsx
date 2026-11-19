@@ -18,6 +18,7 @@ import { Suspense } from "react"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { t } from "@/lib/translations"
+import { DownloadAppButton } from "@/components/DownloadAppButton"
 import React from "react"
 
 interface EnlaceNav {
@@ -262,6 +263,7 @@ export function Navbar() {
               )}
             </form>
 
+            <DownloadAppButton variant="nav" />
             <a
               href={PATREON_URL}
               target="_blank"
@@ -320,6 +322,8 @@ export function Navbar() {
                 className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
               />
             </form>
+
+            <DownloadAppButton variant="menu" onNavigate={() => setOpen(false)} />
 
             <a
               href={PATREON_URL}

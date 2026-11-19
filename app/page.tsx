@@ -8,6 +8,7 @@ import { HeroBanner } from "@/components/HeroBanner"
 import { ContinueWatching } from "@/components/ContinueWatching"
 import { SkeletonAnimeCard } from "@/components/SkeletonAnimeCard"
 import { DiscordPromoToast } from "@/components/DiscordPromoToast"
+import { DownloadAppSection } from "@/components/DownloadAppButton"
 import { cn } from "@/lib/utils"
 import { Suspense, useEffect, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -165,6 +166,7 @@ function HomeContent() {
       <HeroBanner />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <DownloadAppSection />
         <ContinueWatching />
 
         <LatestEpisodes />

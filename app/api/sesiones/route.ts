@@ -1,187 +1,121 @@
-import { createServerClient } from "@/lib/supabase"
-import { NextResponse } from "next/server"
-import { getToken } from "next-auth/jwt"
-import { NextRequest } from "next/server"
-import { rateLimit } from "@/lib/rate-limit"
-import {
-  obtenerIP,
-  esUUID,
-  esEnteroEnRango,
-  verificarOrigen,
-  cuerpoDentroDelLimite,
-  respuestaLimite,
-  errorInterno,
-  noAutorizado,
-} from "@/lib/security"
-
-interface Sesion {
-  id: string
-  user_id: string
-  anime_id: string
-  episodio_numero: number
-  started_at: string
-  ended_at: string | null
-  last_seen_at: string
-  segundos_visto: number
-  created_at: string
-  updated_at: string
-}
-
-interface CuerpoSesion {
-  anime_id?: unknown
-  episodio_numero?: unknown
-  segundos?: unknown
-  finalizar?: unknown
-}
-
-async function obtenerUsuarioSesion(
-  req: NextRequest
-): Promise<{ userId: string; email: string | null } | null> {
-  const token = await getToken({
-    req: req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
-  const userId = token?.sub || null
-  if (!userId) {
-    return null
-  }
-  return { userId, email: token?.email || null }
-}
+import { NextResponse, NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { createAdminSupabaseClient } from "@/lib/server/supabase";
+import { rateLimit } from "@/lib/rate-limit";
+import { obtenerIP, esUUID, esEnteroEnRango, verificarOrigen, cuerpoDentroDelLimite, respuestaLimite, errorInterno, noAutorizado } from "@/lib/security";
 
 export async function GET(req: NextRequest) {
   try {
-    const usuario = await obtenerUsuarioSesion(req)
-    if (!usuario) {
-      return noAutorizado()
-    }
-    const ip = obtenerIP(req)
-    const limite = await rateLimit({ clave: `sesiones:${ip}`, maximo: 120, ventanaSegundos: 60 })
-    if (!limite.permitido) {
-      return respuestaLimite()
-    }
-    const supabase = createServerClient()
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const userId = token?.sub || null;
+    if (!userId) return noAutorizado();
+
+    const ip = obtenerIP(req);
+    const limite = await rateLimit({ clave: `sesiones:${ip}`, maximo: 120, ventanaSegundos: 60 });
+    if (!limite.permitido) return respuestaLimite();
+
+    const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
       .from("sesiones")
       .select("*")
-      .eq("user_id", usuario.userId)
-      .order("started_at", { ascending: false })
-      .limit(200)
+      .eq("user_id", userId)
+      .order("last_seen_at", { ascending: false })
+      .limit(200);
+
     if (error) {
-      console.error("Error consultando sesiones:", error.message)
-      return errorInterno(error)
+      console.error("Sesiones GET error:", error.message);
+      return NextResponse.json({ ok: false, error: "No se pudieron consultar las sesiones." }, { status: 500 });
     }
-    const items = (data || []) as Sesion[]
-    return NextResponse.json({ ok: true, items })
+    return NextResponse.json({ ok: true, items: data || [] });
   } catch (err) {
-    return errorInterno(err)
+    return errorInterno(err);
   }
 }
 
 export async function POST(req: Request) {
   try {
-    if (!verificarOrigen(req)) {
-      return NextResponse.json({ ok: false, error: "Origen no permitido." }, { status: 403 })
-    }
-    const nextReq = new NextRequest(req.url, {
-      headers: req.headers,
-    })
-    const token = await getToken({
-      req: nextReq,
-      secret: process.env.NEXTAUTH_SECRET,
-    })
-    const userId = token?.sub || null
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 })
-    }
-    const ip = obtenerIP(req)
-    const limite = await rateLimit({ clave: `sesiones:${ip}`, maximo: 60, ventanaSegundos: 60 })
-    if (!limite.permitido) {
-      return respuestaLimite()
-    }
-    if (!cuerpoDentroDelLimite(req)) {
-      return NextResponse.json(
-        { ok: false, error: "Cuerpo de la solicitud demasiado grande." },
-        { status: 413 }
-      )
-    }
-    const body = (await req.json()) as CuerpoSesion
-    const animeId = body.anime_id
-    const episodioNumero = body.episodio_numero
-    const finalizar = body.finalizar === true
-    const segundosIngresos =
-      typeof body.segundos === "number" ? Math.min(86400, Math.max(0, Math.floor(body.segundos))) : 0
-    if (!animeId || !esUUID(animeId)) {
-      return NextResponse.json({ ok: false, error: "anime_id no valido." }, { status: 400 })
-    }
-    if (!esEnteroEnRango(episodioNumero, 1, 100000)) {
-      return NextResponse.json({ ok: false, error: "episodio_numero no valido." }, { status: 400 })
-    }
-    const supabase = createServerClient()
-    const ahora = new Date().toISOString()
-    if (finalizar) {
-      const { error: errorFinalizar } = await supabase
+    if (!verificarOrigen(req)) return NextResponse.json({ ok: false, error: "Origen no permitido." }, { status: 403 });
+
+    const nextReq = new NextRequest(req.url, { headers: req.headers });
+    const token = await getToken({ req: nextReq, secret: process.env.NEXTAUTH_SECRET });
+    const userId = token?.sub || null;
+    if (!userId) return NextResponse.json({ ok: false, error: "No autenticado." }, { status: 401 });
+
+    const ip = obtenerIP(req);
+    const limite = await rateLimit({ clave: `sesiones:${ip}`, maximo: 120, ventanaSegundos: 60 });
+    if (!limite.permitido) return respuestaLimite();
+    if (!cuerpoDentroDelLimite(req)) return NextResponse.json({ ok: false, error: "Cuerpo demasiado grande." }, { status: 413 });
+
+    const body = (await req.json()) as { anime_id?: unknown; episodio_numero?: unknown; segundos?: unknown; finalizar?: unknown };
+    const { anime_id, episodio_numero, finalizar } = body;
+    const segundosIngresos = typeof body.segundos === "number" && Number.isFinite(body.segundos) ? Math.min(86400, Math.max(0, Math.floor(body.segundos))) : 0;
+
+    if (!esUUID(anime_id)) return NextResponse.json({ ok: false, error: "anime_id no válido." }, { status: 400 });
+    if (!esEnteroEnRango(episodio_numero, 1, 100000)) return NextResponse.json({ ok: false, error: "episodio_numero no válido." }, { status: 400 });
+
+    const supabase = createAdminSupabaseClient();
+    const ahora = new Date().toISOString();
+
+    if (finalizar === true) {
+      const { error } = await supabase
         .from("sesiones")
-        .update({ ended_at: ahora, last_seen_at: ahora, updated_at: ahora })
+        .update({ ended_at: ahora, last_seen_at: ahora, updated_at: ahora, segundos_visto: segundosIngresos })
         .eq("user_id", userId)
-        .eq("anime_id", animeId)
-        .eq("episodio_numero", episodioNumero)
-        .is("ended_at", null)
-      if (errorFinalizar) {
-        console.error("Error finalizando sesion:", errorFinalizar.message)
-        return errorInterno(errorFinalizar)
+        .eq("anime_id", anime_id)
+        .eq("episodio_numero", episodio_numero)
+        .is("ended_at", null);
+      if (error) {
+        console.error("Sesiones finalizar error:", error.message);
+        return NextResponse.json({ ok: false, error: "No se pudo finalizar la sesión." }, { status: 500 });
       }
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true });
     }
-    const { data: abiertas, error: errorAbiertas } = await supabase
+
+    const { data: abiertas, error: errAbiertas } = await supabase
       .from("sesiones")
-      .select("id, started_at, segundos_visto")
+      .select("id, segundos_visto")
       .eq("user_id", userId)
-      .eq("anime_id", animeId)
-      .eq("episodio_numero", episodioNumero)
+      .eq("anime_id", anime_id)
+      .eq("episodio_numero", episodio_numero)
       .is("ended_at", null)
       .order("started_at", { ascending: false })
-      .limit(1)
-    if (errorAbiertas) {
-      console.error("Error consultando sesion abierta:", errorAbiertas.message)
-      return errorInterno(errorAbiertas)
+      .limit(1);
+
+    if (errAbiertas) {
+      console.error("Sesiones abiertas error:", errAbiertas.message);
+      return NextResponse.json({ ok: false, error: "No se pudo consultar la sesión." }, { status: 500 });
     }
+
     if (abiertas && abiertas.length > 0) {
-      const sesionAbierta = abiertas[0] as unknown as Sesion
-      const nuevosSegundos = Math.max(sesionAbierta.segundos_visto || 0, segundosIngresos)
-      const { error: errorUpdate } = await supabase
+      const abierta = abiertas[0] as { id: string; segundos_visto: number | null };
+      const nuevos = Math.max(abierta.segundos_visto || 0, segundosIngresos);
+      const { error } = await supabase
         .from("sesiones")
-        .update({
-          last_seen_at: ahora,
-          segundos_visto: nuevosSegundos,
-          updated_at: ahora,
-        })
-        .eq("id", sesionAbierta.id)
-      if (errorUpdate) {
-        console.error("Error actualizando sesion:", errorUpdate.message)
-        return errorInterno(errorUpdate)
+        .update({ last_seen_at: ahora, updated_at: ahora, segundos_visto: nuevos })
+        .eq("id", abierta.id);
+      if (error) {
+        console.error("Sesiones update error:", error.message);
+        return NextResponse.json({ ok: false, error: "No se pudo actualizar la sesión." }, { status: 500 });
       }
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true });
     }
-    const { error: errorInsert } = await supabase
-      .from("sesiones")
-      .insert({
-        user_id: userId,
-        anime_id: animeId,
-        episodio_numero: episodioNumero,
-        started_at: ahora,
-        ended_at: null,
-        last_seen_at: ahora,
-        segundos_visto: segundosIngresos,
-        updated_at: ahora,
-      })
-    if (errorInsert) {
-      console.error("Error creando sesion:", errorInsert.message)
-      return errorInterno(errorInsert)
+
+    const { error } = await supabase.from("sesiones").insert({
+      user_id: userId,
+      anime_id,
+      episodio_numero,
+      started_at: ahora,
+      ended_at: null,
+      last_seen_at: ahora,
+      segundos_visto: segundosIngresos,
+      updated_at: ahora,
+    });
+    if (error) {
+      console.error("Sesiones insert error:", error.message);
+      return NextResponse.json({ ok: false, error: "No se pudo crear la sesión." }, { status: 500 });
     }
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true });
   } catch (err) {
-    return errorInterno(err)
+    return errorInterno(err);
   }
 }
-
-

@@ -1,52 +1,33 @@
-import { createServerClient } from "@/lib/supabase"
-import { NextResponse } from "next/server"
-import { getToken } from "next-auth/jwt"
-import { NextRequest } from "next/server"
-import { rateLimit } from "@/lib/rate-limit"
-import { obtenerIP, respuestaLimite, errorInterno } from "@/lib/security"
-
-async function getUserId(req: NextRequest): Promise<string | null> {
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  })
-  return token?.sub || null
-}
+import { NextResponse, NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { createAdminSupabaseClient } from "@/lib/server/supabase";
+import { rateLimit } from "@/lib/rate-limit";
+import { obtenerIP, respuestaLimite, errorInterno } from "@/lib/security";
 
 export async function GET(req: NextRequest) {
   try {
-    const user_id = await getUserId(req)
-    if (!user_id) {
-      return NextResponse.json({ ok: true, items: [] })
-    }
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const userId = token?.sub || null;
+    if (!userId) return NextResponse.json({ ok: true, items: [] });
 
-    const ip = obtenerIP(req)
-    const limite = await rateLimit({ clave: `watchlist-mine:${ip}`, maximo: 60, ventanaSegundos: 60 })
-    if (!limite.permitido) {
-      return respuestaLimite()
-    }
+    const ip = obtenerIP(req);
+    const limite = await rateLimit({ clave: `watchlist-mine:${ip}`, maximo: 60, ventanaSegundos: 60 });
+    if (!limite.permitido) return respuestaLimite();
 
-    const supabase = createServerClient()
-
+    const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase
       .from("watchlists")
       .select("*, animes(*)")
-      .eq("user_id", user_id)
-      .order("created_at", { ascending: false })
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Watchlist mine error:", error.message)
-      return NextResponse.json(
-        { ok: false, error: "No se pudo cargar tu lista." },
-        { status: 500 }
-      )
+      console.error("Watchlist mine error:", error.message);
+      return NextResponse.json({ ok: false, error: "No se pudo cargar tu lista." }, { status: 500 });
     }
 
-    return NextResponse.json({
-      ok: true,
-      items: data || [],
-    })
+    return NextResponse.json({ ok: true, items: data || [] });
   } catch (err) {
-    return errorInterno(err)
+    return errorInterno(err);
   }
 }

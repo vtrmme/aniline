@@ -30,15 +30,14 @@ export interface ResultadoSlug {
 }
 
 function decodificarEscapesJs(cadena: string): string {
-  const sinComillas = cadena
   let intento: string | null = null
   try {
-    intento = JSON.parse(`"${sinComillas.replace(/"/g, '\\"')}"`) as string
+    intento = JSON.parse(`"${cadena.replace(/"/g, '\\"')}"`) as string
   } catch {
     intento = null
   }
   if (intento) return intento
-  return sinComillas
+  return cadena
     .replace(/\\u([0-9a-fA-F]{4})/g, (_m, hex: string) =>
       String.fromCharCode(parseInt(hex, 16))
     )
@@ -154,7 +153,12 @@ export async function obtenerStreamAniZone(
 
   const crudo = extraerCuerpoJs(html, "vidstackPlayer(JSON.parse('")
   if (!crudo) return null
-  const config = JSON.parse(decodificarEscapesJs(crudo)) as ConfigVidstack
+  let config: ConfigVidstack
+  try {
+    config = JSON.parse(decodificarEscapesJs(crudo)) as ConfigVidstack
+  } catch {
+    return null
+  }
   if (!config.src || !config.src.includes(".m3u8")) return null
 
   const subtitulos: SubtituloAniZone[] = (config.subtitles || [])

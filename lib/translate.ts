@@ -203,7 +203,7 @@ export async function traducirVttAEspanol(
   }
 
   if (traducidas === 0 && tareas.length > 0) {
-    throw new Error("No se pudo traducir el subt?tulo")
+    throw new Error("No se pudo traducir el subtítulo")
   }
 
   const salida: string[] = ["WEBVTT", ""]

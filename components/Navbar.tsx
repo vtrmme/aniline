@@ -1,367 +1,194 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import Image from "next/image"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useSession, signIn, signOut } from "next-auth/react"
-import {
-  Menu,
-  X,
-  LogIn,
-  LogOut,
-  Moon,
-  Sun,
-  Search,
-  Heart,
-} from "lucide-react"
-import { Suspense } from "react"
-import { cn } from "@/lib/utils"
-import { useLanguage } from "@/contexts/LanguageContext"
-import { t } from "@/lib/translations"
-import { DownloadAppButton } from "@/components/DownloadAppButton"
-import React from "react"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
+import { Search, LogIn, LogOut, User, Shield, Menu, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { DownloadAppButton } from "@/components/DownloadAppButton";
 
-interface EnlaceNav {
-  href: string
-  label: string
-  activo: boolean
-}
-
-const PATREON_URL = "https://www.patreon.com/AniLine"
-
-const EMAIL_ADMIN = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase()
-
-function esEmailAdmin(email: string | null | undefined): boolean {
-  if (!email || !EMAIL_ADMIN) {
-    return false
-  }
-  return email.trim().toLowerCase() === EMAIL_ADMIN
-}
-
-function construirEnlaces(
-  pathname: string,
-  params: URLSearchParams,
-  lang: "es" | "en",
-  haySesion: boolean,
-  emailSesion: string | null
-): EnlaceNav[] {
-  const estado = params.get("estado")
-  const orden = params.get("orden")
-  const enHome = pathname === "/"
-
-  const enlaces: EnlaceNav[] = [
-    {
-      href: "/",
-      label: t(lang, "navExplorar"),
-      activo: enHome && !estado && orden !== "puntuacion",
-    },
-    {
-      href: "/?estado=" + encodeURIComponent("en emisión") + "#explorar",
-      label: t(lang, "navSimulcasts"),
-      activo: enHome && estado === "en emisión",
-    },
-    {
-      href: "/?orden=puntuacion#explorar",
-      label: t(lang, "navPopular"),
-      activo: enHome && orden === "puntuacion" && estado !== "en emisión",
-    },
-  ]
-
-  if (haySesion) {
-    enlaces.push({ href: "/lista", label: t(lang, "navMyList"), activo: pathname === "/lista" })
-    enlaces.push({ href: "/perfil", label: t(lang, "navPerfil"), activo: pathname === "/perfil" })
-  }
-
-  if (haySesion && esEmailAdmin(emailSesion)) {
-    enlaces.push({ href: "/admin", label: "Admin", activo: pathname === "/admin" })
-  }
-
-  return enlaces
-}
-
-function EnlacesNav({
-  cerrarMenu,
-  variante,
-}: {
-  cerrarMenu: () => void
-  variante: "desktop" | "movil"
-}) {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const { lang } = useLanguage()
-  const { data: session } = useSession()
-
-  const enlaces = construirEnlaces(
-    pathname,
-    new URLSearchParams(searchParams.toString()),
-    lang,
-    !!session,
-    (session?.user as unknown as { email?: string | null })?.email ?? null
-  )
-
-  if (variante === "desktop") {
-    return (
-      <div className="hidden items-center gap-1 md:flex">
-        {enlaces.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={cn(
-              "relative rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-              link.activo
-                ? "text-[var(--brand-bright)]"
-                : "text-gray-300 hover:text-white"
-            )}
-          >
-            {link.label}
-            {link.activo && (
-              <span className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-[var(--brand)]" />
-            )}
-          </Link>
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <>
-      {enlaces.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          onClick={cerrarMenu}
-          className={cn(
-            "block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-            link.activo
-              ? "bg-[var(--brand-soft)] text-[var(--brand-bright)]"
-              : "text-gray-300 hover:bg-white/5 hover:text-white"
-          )}
-        >
-          {link.label}
-        </Link>
-      ))}
-    </>
-  )
-}
+const navLinks = (isAuth: boolean) => [
+  { href: "/", key: "navExplore" as const, auth: false },
+  { href: "/buscar", key: "navSearch" as const, auth: false },
+  { href: "/apoyanos", key: "navSupport" as const, auth: false },
+  { href: "/lista", key: "navMyList" as const, auth: true },
+].filter((l) => !l.auth || isAuth);
 
 export function Navbar() {
-  const { data: session } = useSession()
-  const router = useRouter()
-  const [open, setOpen] = React.useState(false)
-  const [busqueda, setBusqueda] = React.useState(false)
-  const [q, setQ] = React.useState("")
-  const [scrolled, setScrolled] = React.useState(false)
-  const [dark, setDark] = React.useState(() => {
-    try {
-      return localStorage.getItem("aniline-theme") === "dark"
-    } catch {
-      return false
-    }
-  })
+  const { data: session, status } = useSession();
+  const { t, lang, setLang } = useLanguage();
+  const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const { lang, setLang } = useLanguage()
+  const user = session?.user;
+  const isAuth = status === "authenticated" && !!user;
 
-  React.useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }, [dark])
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
-  React.useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
-    onScroll()
-    window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
-  }, [])
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
-  const toggleTheme = () => {
-    const next = !dark
-    setDark(next)
-    try {
-      localStorage.setItem("aniline-theme", next ? "dark" : "light")
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleAuth = () => {
-    if (session) {
-      signOut({ callbackUrl: "/" })
-    } else {
-      signIn("google", { callbackUrl: "/" })
-    }
-  }
-
-  const enviarBusqueda = (e: React.FormEvent) => {
-    e.preventDefault()
-    const texto = q.trim()
-    router.push(texto ? `/buscar?q=${encodeURIComponent(texto)}` : "/buscar")
-    setBusqueda(false)
-    setOpen(false)
-  }
+  const links = navLinks(isAuth);
+  const closeMenu = () => setOpen(false);
 
   return (
     <nav
       className={cn(
         "fixed top-0 z-50 w-full transition-colors duration-300",
-        scrolled ? "glass" : "border-b border-transparent bg-transparent"
+        scrolled || open ? "glass" : "border-b border-transparent bg-transparent",
       )}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex shrink-0 items-center" aria-label="AniLine">
-              <Image
-                src="/aniline-logo.png"
-                alt="AniLine"
-                width={132}
-                height={44}
-                priority
-                className="h-11 w-auto"
-              />
-            </Link>
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex shrink-0 items-center" aria-label={t("siteName")} onClick={closeMenu}>
+            <Image src="/aniline-logo.png" alt={t("siteName")} width={132} height={44} priority className="h-10 w-auto" />
+          </Link>
+          <div className="hidden items-center gap-1 md:flex">
+            {links.map((l) => {
+              const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  onClick={closeMenu}
+                  className={cn(
+                    "relative rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+                    active ? "text-white" : "text-gray-300 hover:text-white",
+                  )}
+                >
+                  {t(l.key)}
+                  {active && <span className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-[var(--brand)]" />}
+                </Link>
+              );
+            })}
           </div>
+        </div>
 
-          <Suspense fallback={<div className="hidden md:flex" />}>
-            <EnlacesNav cerrarMenu={() => setOpen(false)} variante="desktop" />
-          </Suspense>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/buscar"
+            onClick={closeMenu}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white"
+            aria-label={t("navSearch")}
+          >
+            <Search size={18} />
+          </Link>
 
-          <div className="flex items-center gap-2">
-            <form
-              onSubmit={enviarBusqueda}
-              className={cn(
-                "hidden items-center overflow-hidden rounded-full border transition-all duration-300 md:flex",
-                busqueda
-                  ? "w-64 border-white/15 bg-[var(--surface)] px-3"
-                  : "w-10 border-transparent bg-transparent justify-center"
-              )}
-            >
-              <button
-                type={busqueda ? "submit" : "button"}
-                onClick={() => {
-                  if (!busqueda) setBusqueda(true)
-                }}
-                className="flex h-9 shrink-0 items-center justify-center text-gray-300 transition hover:text-white"
-                aria-label={t(lang, "navSearch")}
+          <DownloadAppButton variant="nav" />
+          <button
+            type="button"
+            onClick={() => setLang(lang === "es" ? "en" : "es")}
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 transition hover:bg-white/10 hover:text-white"
+            aria-label={t("language")}
+          >
+            {lang === "es" ? t("langEn") : t("langEs")}
+          </button>
+
+          {isAuth ? (
+            <>
+              <Link
+                href="/perfil"
+                onClick={closeMenu}
+                className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-200 transition hover:bg-white/10 sm:inline-flex"
               >
-                <Search size={18} />
+                <User size={15} />
+                <span className="max-w-[120px] truncate">{user?.name || t("navProfile")}</span>
+              </Link>
+              {user?.isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={closeMenu}
+                  className="hidden h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white sm:flex"
+                  aria-label={t("navAdmin")}
+                  title={t("navAdmin")}
+                >
+                  <Shield size={16} />
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="hidden h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white sm:flex"
+                aria-label={t("navLogout")}
+                title={t("navLogout")}
+              >
+                <LogOut size={16} />
               </button>
-              {busqueda && (
-                <input
-                  autoFocus
-                  type="text"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  onBlur={() => {
-                    if (!q.trim()) setBusqueda(false)
-                  }}
-                  placeholder={t(lang, "searchPlaceholder")}
-                  className="w-full bg-transparent py-2 pl-2 text-sm text-white placeholder:text-gray-500 focus:outline-none"
-                />
-              )}
-            </form>
+            </>
+          ) : (
+            <Link href="/auth/signin" onClick={closeMenu} className="btn-brand hidden items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold sm:inline-flex">
+              <LogIn size={16} /> {t("navLogin")}
+            </Link>
+          )}
 
-            <DownloadAppButton variant="nav" />
-            <a
-              href={PATREON_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 rounded-full bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--brand-bright)] md:inline-flex"
-            >
-              <Heart size={15} fill="currentColor" />
-              {t(lang, "navSupport")}
-            </a>
-            <button
-              onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white"
-              aria-label={dark ? t(lang, "themeLight") : t(lang, "themeDark")}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button
-              onClick={() => setLang(lang === "es" ? "en" : "es")}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-300 transition hover:bg-white/10 hover:text-white"
-            >
-              {lang === "es" ? t(lang, "langEn") : t(lang, "langEs")}
-            </button>
-            <button
-              onClick={handleAuth}
-              className={cn(
-                "hidden items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition md:inline-flex",
-                session
-                  ? "btn-ghost"
-                  : "bg-[var(--brand)] text-white hover:bg-[var(--brand-bright)]"
-              )}
-            >
-              {session ? <LogOut size={16} /> : <LogIn size={16} />}
-              {session ? t(lang, "navLogout") : t(lang, "navLogin")}
-            </button>
-            <button
-              onClick={() => setOpen(!open)}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white md:hidden"
-              aria-label="Menú"
-            >
-              {open ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition hover:bg-white/10 hover:text-white md:hidden"
+            aria-label={open ? t("closeMenu") : t("openMenu")}
+            aria-expanded={open}
+            aria-controls="mobile-menu"
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
       </div>
 
       {open && (
-        <div className="glass border-t border-white/10 md:hidden">
+        <div id="mobile-menu" className="glass border-t border-white/10 md:hidden">
           <div className="space-y-1 px-4 py-4">
-            <form onSubmit={enviarBusqueda} className="mb-3 flex items-center gap-2 rounded-full border border-white/10 bg-[var(--surface)] px-4 py-2">
-              <Search size={16} className="shrink-0 text-gray-400" />
-              <input
-                type="text"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t(lang, "searchPlaceholder")}
-                className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
-              />
-            </form>
-
-            <DownloadAppButton variant="menu" onNavigate={() => setOpen(false)} />
-
-            <a
-              href={PATREON_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="mb-1 flex items-center justify-center gap-2 rounded-lg bg-[var(--brand)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-bright)]"
-            >
-              <Heart size={16} fill="currentColor" />
-              {t(lang, "navSupport")}
-            </a>
-
-            <Suspense fallback={null}>
-              <EnlacesNav cerrarMenu={() => setOpen(false)} variante="movil" />
-            </Suspense>
-
-            <div className="flex items-center justify-between rounded-lg px-3 py-2.5">
-              <span className="text-sm text-gray-400">
-                {dark ? t(lang, "themeDark") : t(lang, "themeLight")}
-              </span>
-              <button onClick={toggleTheme} className="text-gray-300 hover:text-white">
-                {dark ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                handleAuth()
-                setOpen(false)
-              }}
-              className="mt-1 w-full rounded-lg bg-[var(--brand)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--brand-bright)]"
-            >
-              {session ? t(lang, "navLogout") : t(lang, "navLogin")}
-            </button>
+            <DownloadAppButton variant="menu" onNavigate={closeMenu} />
+            {links.map((l) => {
+              const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  onClick={closeMenu}
+                  className={cn(
+                    "block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                    active ? "bg-[var(--brand-soft)] text-white" : "text-gray-300 hover:bg-white/5 hover:text-white",
+                  )}
+                >
+                  {t(l.key)}
+                </Link>
+              );
+            })}
+            {isAuth ? (
+              <>
+                <Link href="/perfil" onClick={closeMenu} className="block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">{t("navProfile")}</Link>
+                {user?.isAdmin && <Link href="/admin" onClick={closeMenu} className="block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">{t("navAdmin")}</Link>}
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="mt-1 w-full rounded-lg bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  {t("navLogout")}
+                </button>
+              </>
+            ) : (
+              <Link href="/auth/signin" onClick={closeMenu} className="btn-brand mt-1 block w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold">
+                {t("navLogin")}
+              </Link>
+            )}
           </div>
         </div>
       )}
     </nav>
-  )
+  );
 }
-

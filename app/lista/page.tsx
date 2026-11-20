@@ -1,164 +1,119 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { cn } from "@/lib/utils"
-import { AnimeCard } from "@/components/AnimeCard"
-import { SkeletonAnimeCard } from "@/components/SkeletonAnimeCard"
-import type { Anime } from "@/types"
-import { useLanguage } from "@/contexts/LanguageContext"
-import { t } from "@/lib/translations"
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { ListVideo } from "lucide-react";
+import { AnimeCard } from "@/components/AnimeCard";
+import { useLanguage } from "@/contexts/LanguageContext";
+import type { AnimeRow } from "@/types/db";
 
-interface WatchlistItem {
-  id: string
-  user_id: string
-  anime_id: string
-  estado: string
-  progreso?: number
-  puntuacion?: number
-  created_at: string
-  animes: Anime
+type Estado = "para_ver" | "viendo" | "visto";
+
+interface Item {
+  anime_id: string;
+  estado: Estado;
+  animes: AnimeRow | null;
 }
 
-export default function Lista() {
-  const { lang } = useLanguage()
-  const [items, setItems] = useState<{ anime: Anime; estado: string; puntuacion?: number }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<Set<string>>(new Set())
+export default function ListaPage() {
+  const { status } = useSession();
+  const router = useRouter();
+  const { t, lang } = useLanguage();
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/watchlist/mine", { cache: "no-store" });
+      if (res.ok) {
+        const j = await res.json();
+        const arr = Array.isArray(j.items) ? j.items : [];
+        setItems(arr.filter((x: Item) => x && x.animes));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const cargar = async () => {
-      try {
-        const res = await fetch("/api/watchlist/mine")
-        if (res.ok) {
-          const json = await res.json()
-          setItems(
-            (json.items || []).map((d: WatchlistItem) => ({
-              anime: d.animes as Anime,
-              estado: d.estado,
-              puntuacion: d.puntuacion,
-            }))
-          )
-        }
-      } catch {
-        // ignore
-      } finally {
-        setLoading(false)
-      }
+    if (status === "unauthenticated") {
+      router.replace("/auth/signin?callbackUrl=/lista");
+      return;
     }
-    cargar()
-  }, [lang])
+    if (status === "authenticated") load();
+  }, [status, router, load]);
 
-  const estadoLabel = (estado: string) => {
-    if (lang === "es") return estado
-    const map: Record<string, string> = {
-      para_ver: "plan to watch",
-      viendo: "watching",
-      visto: "completed",
-    }
-    return map[estado] || estado
-  }
+  const changeEstado = async (animeId: string, estado: Estado) => {
+    setItems((prev) => prev.map((it) => it.anime_id === animeId ? { ...it, estado } : it));
+    await fetch("/api/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anime_id: animeId, estado }),
+    }).catch(() => {});
+  };
 
-  const estadoColor = (estado: string) => {
-    switch (estado) {
-      case "visto":
-        return "bg-emerald-600/90"
-      case "viendo":
-        return "bg-blue-600/90"
-      case "para_ver":
-        return "bg-amber-500/90 text-black"
-      default:
-        return "bg-gray-600/90"
-    }
-  }
+  const remove = async (animeId: string) => {
+    setItems((prev) => prev.filter((it) => it.anime_id !== animeId));
+    await fetch(`/api/watchlist?anime_id=${encodeURIComponent(animeId)}`, { method: "DELETE" }).catch(() => {});
+  };
 
-  const cambiarEstado = async (animeId: string, nuevoEstado: string) => {
-    setSaving((prev) => new Set([...prev, animeId]))
-    try {
-      const res = await fetch("/api/watchlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anime_id: animeId, estado: nuevoEstado }),
-      })
-      if (res.ok) {
-        setItems((prev) =>
-          prev.map((item) =>
-            item.anime.id === animeId
-              ? { ...item, estado: nuevoEstado }
-              : item
-          )
-        )
-      }
-    } catch {
-      // ignore
-    } finally {
-      setSaving((prev) => {
-        const n = new Set(prev)
-        n.delete(animeId)
-        return n
-      })
-    }
-  }
-
-  if (loading) {
+  if (status === "loading" || (status === "authenticated" && loading)) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <SkeletonAnimeCard key={i} />
-          ))}
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-white">{t("myListTitle")}</h1>
+        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="skeleton aspect-[2/3] rounded-xl" />)}
         </div>
       </div>
-    )
+    );
   }
+
+  if (status !== "authenticated") return null;
+
+  const labelFor = (e: Estado) => e === "para_ver" ? t("watchlistPlan") : e === "viendo" ? t("watchlistWatching") : t("watchlistCompleted");
+  const estados: Estado[] = ["para_ver", "viendo", "visto"];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="mb-8 text-3xl font-bold text-white">{t(lang, "myListTitle")}</h1>
+      <h1 className="mb-8 text-3xl font-bold text-white">{t("myListTitle")}</h1>
       {items.length === 0 ? (
-        <p className="py-20 text-center text-gray-400">
-          {t(lang, "myListEmpty")}
-        </p>
+        <div className="rounded-2xl border border-white/10 bg-[var(--surface)] px-6 py-16 text-center">
+          <ListVideo size={40} className="mx-auto mb-4 text-gray-500" aria-hidden="true" />
+          <p className="text-lg font-semibold text-white">{t("myListEmpty")}</p>
+          <p className="mt-2 text-sm text-gray-400">{t("myListEmptyDesc")}</p>
+          <Link href="/" className="btn-brand mt-6 inline-flex rounded-full px-6 py-2.5 text-sm font-semibold">
+            {t("navExplore")}
+          </Link>
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {items.map(({ anime, estado, puntuacion }) => (
-            <div key={anime.id} className="relative">
-              <div className="absolute right-2 top-2 z-20">
-                <span
-                  className={cn(
-                    "cursor-default rounded-md px-2 py-1 text-xs font-bold text-white shadow-md",
-                    estadoColor(estado)
-                  )}
-                >
-                  {estadoLabel(estado)}
-                </span>
+          {items.map(({ anime_id, estado, animes }) => {
+            if (!animes) return null;
+            return (
+              <div key={anime_id} className="flex flex-col">
+                <AnimeCard anime={animes} lang={lang} />
+                <div className="mt-2 flex gap-1.5">
+                  {estados.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => changeEstado(anime_id, e)}
+                      className={`flex-1 rounded-md py-1 text-[10px] font-semibold uppercase tracking-wide transition ${estado === e ? "bg-[var(--brand)] text-white" : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"}`}
+                    >
+                      {labelFor(e)}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => remove(anime_id)} className="mt-1.5 text-center text-[11px] text-gray-500 transition hover:text-red-400">
+                  {t("watchlistRemove")}
+                </button>
               </div>
-              {puntuacion != null && (
-                <span className="badge-gold absolute left-2 top-2 z-20 rounded-md px-1.5 py-0.5 text-[11px] font-bold backdrop-blur">
-                  ⭐ {puntuacion}
-                </span>
-              )}
-              <AnimeCard anime={anime} lang={lang} />
-              <div className="mt-2 flex gap-1.5">
-                {(["para_ver", "viendo", "visto"] as const).map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => cambiarEstado(anime.id, e)}
-                    disabled={saving.has(anime.id)}
-                    className={cn(
-                      "flex-1 rounded-md py-1 text-[10px] font-semibold uppercase tracking-wide transition disabled:opacity-50",
-                      estado === e
-                        ? "bg-[var(--brand)] text-white"
-                        : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                    )}
-                  >
-                    {estadoLabel(e)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
-  )
+  );
 }

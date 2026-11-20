@@ -139,13 +139,13 @@ async function pedirConReintentos(
       })
 
       if (response.status === 429) {
-        ultimoError = `${proveedor} limitó las peticiones (429)`
+        ultimoError = `${proveedor} limito las peticiones (429)`
         await dormir(2000 * intento)
         continue
       }
 
       if (!response.ok) {
-        throw new Error(`${proveedor} respondió con estado ${response.status}`)
+        throw new Error(`${proveedor} respondio con estado ${response.status}`)
       }
 
       return response
@@ -194,7 +194,7 @@ function mapearTipoTenrai(type?: string | null): string | undefined {
 
 function mapearTenrai(item: TenraiAnime): AnilistMedia {
   const titleEs = item.title || ""
-  const añoAired = item.aired?.from ? new Date(item.aired.from).getFullYear() : undefined
+  const anoAired = item.aired?.from ? new Date(item.aired.from).getFullYear() : undefined
 
   return {
     id: item.mal_id,
@@ -211,8 +211,8 @@ function mapearTenrai(item: TenraiAnime): AnilistMedia {
       year:
         typeof item.year === "number"
           ? item.year
-          : Number.isFinite(añoAired)
-            ? añoAired
+          : Number.isFinite(anoAired)
+            ? anoAired
             : undefined,
     },
     status: mapearEstadoTenrai(item.status),
@@ -294,7 +294,7 @@ function mapearKitsu(item: KitsuAnime, generos: Map<string, string>): AnilistMed
   const attrs = item.attributes
   const titleEs = attrs?.titles?.en_jp || attrs?.canonicalTitle || ""
   const rating = attrs?.averageRating ? Number(attrs.averageRating) : undefined
-  const año = attrs?.startDate ? new Date(attrs.startDate).getFullYear() : undefined
+  const ano = attrs?.startDate ? new Date(attrs.startDate).getFullYear() : undefined
   const idsGenero =
     item.relationships?.genres?.data
       ?.map((g) => g.id)
@@ -315,7 +315,7 @@ function mapearKitsu(item: KitsuAnime, generos: Map<string, string>): AnilistMed
     },
     description: attrs?.synopsis ?? undefined,
     startDate: {
-      year: Number.isFinite(año) ? año : undefined,
+      year: Number.isFinite(ano) ? ano : undefined,
     },
     status: mapearEstadoKitsu(attrs?.status),
     episodes: attrs?.episodeCount ?? undefined,
@@ -400,14 +400,14 @@ export async function buscarAnimesConFallback(
     return await searchAnimes(query, perPage)
   } catch (err) {
     const mensaje = err instanceof Error ? err.message : "Error desconocido"
-    console.warn(`AniList falló en la búsqueda (${mensaje}); probando Tenrai...`)
+    console.warn(`AniList fallo en la busqueda (${mensaje}); probando Tenrai...`)
   }
 
   try {
     return await searchTenrai(query, perPage)
   } catch (err) {
     const mensaje = err instanceof Error ? err.message : "Error desconocido"
-    console.warn(`Tenrai falló en la búsqueda (${mensaje}); probando Kitsu...`)
+    console.warn(`Tenrai fallo en la busqueda (${mensaje}); probando Kitsu...`)
   }
 
   return searchKitsu(query, perPage)

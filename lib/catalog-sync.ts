@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase"
+import { createAdminSupabaseClient } from "@/lib/server/supabase"
 import {
   fetchCatalogPage,
   mapAnilistToAnime,
@@ -207,7 +207,7 @@ async function procesarMedia(
     animeId = data.id
   }
 
-  // Episodios: añadir solo los que falten (nunca borra video_url)
+  // Episodios: anadir solo los que falten (nunca borra video_url)
   const { data: epsData, error: epsError } = await supabase
     .from("episodes")
     .select("numero")
@@ -239,7 +239,7 @@ async function procesarMedia(
 export async function syncCatalog(
   opciones: SyncCatalogOptions
 ): Promise<SyncCatalogResult> {
-  const supabase = createServerClient()
+  const supabase = createAdminSupabaseClient()
   const resultado: SyncCatalogResult = {
     insertados: 0,
     actualizados: 0,
@@ -261,7 +261,7 @@ export async function syncCatalog(
           proveedorActivo = "anilist"
         } catch (err) {
           const message = err instanceof Error ? err.message : "Error desconocido"
-          console.warn(`AniList falló (${message}); cambiando a Tenrai...`)
+          console.warn(`AniList fallo (${message}); cambiando a Tenrai...`)
           items = await fetchTenraiPage(pagina, PER_PAGE)
           proveedorActivo = "tenrai"
         }
@@ -270,7 +270,7 @@ export async function syncCatalog(
           items = await fetchCatalogPage(pagina, PER_PAGE)
         } catch (err) {
           const message = err instanceof Error ? err.message : "Error desconocido"
-          console.warn(`AniList falló en página ${pagina} (${message}); cambiando a Tenrai...`)
+          console.warn(`AniList fallo en pagina ${pagina} (${message}); cambiando a Tenrai...`)
           items = await fetchTenraiPage(pagina, PER_PAGE)
           proveedorActivo = "tenrai"
         }
@@ -279,7 +279,7 @@ export async function syncCatalog(
           items = await fetchTenraiPage(pagina, PER_PAGE)
         } catch (err) {
           const message = err instanceof Error ? err.message : "Error desconocido"
-          console.warn(`Tenrai falló en página ${pagina} (${message}); cambiando a Kitsu...`)
+          console.warn(`Tenrai fallo en pagina ${pagina} (${message}); cambiando a Kitsu...`)
           items = await fetchKitsuPage(pagina, PER_PAGE)
           proveedorActivo = "kitsu"
         }
@@ -288,7 +288,7 @@ export async function syncCatalog(
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido"
-      console.error(`Error en página ${pagina}: ${message}`)
+      console.error(`Error en pagina ${pagina}: ${message}`)
       resultado.errores++
       break
     }

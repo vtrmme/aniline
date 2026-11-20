@@ -1,4 +1,4 @@
-import type { Anime } from "@/types"
+import type { Anime } from "@/types/anime"
 
 const ANILIST_API_URL = "https://graphql.anilist.co"
 
@@ -101,13 +101,13 @@ async function postAnilist(
 
     if (response.status === 429) {
       const esperaMs = 2000 * intento
-      ultimoError = "AniList limitó las peticiones (429)"
+      ultimoError = "AniList limito las peticiones (429)"
       await dormir(esperaMs)
       continue
     }
 
     if (!response.ok) {
-      ultimoError = `AniList respondió con estado ${response.status}`
+      ultimoError = `AniList respondio con estado ${response.status}`
       await dormir(1500 * intento)
       continue
     }
@@ -173,7 +173,7 @@ ${MEDIA_FIELDS}
 function mapEstado(status?: string): string | undefined {
   switch (status) {
     case "RELEASING":
-      return "en emisión"
+      return "en emision"
     case "FINISHED":
       return "emitido"
     case "CANCELLED":
@@ -181,7 +181,7 @@ function mapEstado(status?: string): string | undefined {
     case "HIATUS":
       return "hiatus"
     case "UPCOMING":
-      return "próximamente"
+      return "proximamente"
     default:
       return undefined
   }
@@ -267,7 +267,7 @@ export function computeTotalEpisodes(
 
   const total = Math.max(declarado, emitidos, existingCount)
   if (total > 0) return total
-  // Animes por estrenar: aún no tienen episodios (no inventar 12)
+  // Animes por estrenar: aAºn no tienen episodios (no inventar 12)
   if (media.status === "UPCOMING") return 0
   return 12
 }

@@ -118,7 +118,6 @@ export function assAVtt(contenido: string): string {
     const cuerpo = linea.replace(/^Dialogue\s*:\s*/i, "")
     const campos = cuerpo.split(",")
     if (indiceTexto < 0 || campos.length < indiceTexto + 1) continue
-    // El texto puede contener comas: se recompone la cola restante
     const prefijo = campos.slice(0, indiceTexto)
     const texto = campos.slice(indiceTexto).join(",")
     const inicio = parsearTiempoAss((prefijo[camposTexto.indexOf("start")] ?? "").trim())

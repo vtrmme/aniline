@@ -1,82 +1,78 @@
-import type { Metadata } from "next"
-import EpisodeClient from "./EpisodeClient"
-import { createServerClient } from "@/lib/supabase"
-import { getSiteUrl, siteConfig } from "@/lib/site"
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { getAnimeBySlug, animeTitle } from "@/lib/server/catalog";
+import { getSiteUrl, siteConfig } from "@/lib/site";
+import { getLang } from "@/lib/i18n/get-lang";
+import { t } from "@/lib/i18n/translations";
+import { EpisodeClient } from "@/components/episode/EpisodeClient";
 
-interface PageProps {
-  params: Promise<{ slug: string; episode: string }>
-}
+type Params = Promise<{ slug: string; episode: string }>;
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug, episode } = await params
-  const fallback: Metadata = {
-    title: "Episodio",
-    description: siteConfig.description,
-  }
-
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const [{ slug, episode }, lang] = await Promise.all([params, getLang()]);
   try {
-    const numero: number = Number(episode)
-    const supabase = createServerClient()
-
-    const { data: anime } = await supabase
-      .from("animes")
-      .select("id, title_es, title_en, poster_url, banner_url, sinopsis_es, sinopsis_en")
-      .eq("slug", slug)
-      .single()
-
-    if (!anime) {
-      return {
-        title: "Episodio no encontrado",
-        description: "No se encontró el episodio solicitado.",
-      }
-    }
-
-    let epTitle: string | null = null
-    if (Number.isInteger(numero) && numero > 0) {
-      const { data: ep } = await supabase
-        .from("episodes")
-        .select("title_es, title_en")
-        .eq("anime_id", anime.id)
-        .eq("numero", numero)
-        .maybeSingle()
-      if (ep) {
-        epTitle = (ep.title_es as string | null) || (ep.title_en as string | null) || null
-      }
-    }
-
-    const animeTitle: string = anime.title_es || anime.title_en || siteConfig.name
-    const title: string = Number.isFinite(numero)
-      ? `${animeTitle} - Episodio ${numero}${epTitle ? `: ${epTitle}` : ""}`
-      : animeTitle
-    const descriptionRaw: string =
-      anime.sinopsis_es || anime.sinopsis_en || siteConfig.description
-    const description: string = descriptionRaw.replace(/\s+/g, " ").trim().slice(0, 160)
-    const image: string = anime.banner_url || anime.poster_url || "/og-image.svg"
-    const url: string = `${getSiteUrl()}/anime/${slug}/${episode}`
-
+    const anime = await getAnimeBySlug(slug);
+    if (!anime) return { title: t(lang, "animeNotFound") };
+    const num = Number(episode);
+    const ep = anime.episodes.find((e) => e.numero === num);
+    const title = animeTitle(anime, lang);
+    const epTitle = ep ? (ep.title_es || ep.title_en || `${t(lang, "episode")} ${ep.numero}`) : `${t(lang, "episode")} ${episode}`;
+    const fullTitle = `${title} - ${epTitle}`;
+    const descRaw = (lang === "es" ? anime.sinopsis_es : anime.sinopsis_en) || anime.sinopsis_es || anime.sinopsis_en || siteConfig.description;
+    const description = descRaw.replace(/\s+/g, " ").trim().slice(0, 160);
+    const image = anime.banner_url || anime.poster_url || "/og-image.svg";
+    const url = `${getSiteUrl()}/anime/${slug}/${episode}`;
     return {
-      title,
+      title: fullTitle,
       description,
       alternates: { canonical: url },
-      openGraph: {
-        title,
-        description,
-        url,
-        type: "video.episode",
-        images: [{ url: image }],
-      },
-      twitter: {
-        card: "summary_large_image",
-        title,
-        description,
-        images: [image],
-      },
-    }
+      openGraph: { title: fullTitle, description, url, type: "video.episode", images: [{ url: image }] },
+      twitter: { card: "summary_large_image", title: fullTitle, description, images: [image] },
+    };
   } catch {
-    return fallback
+    return { title: t(lang, "episode"), description: siteConfig.description };
   }
 }
 
-export default function EpisodePage({ params }: PageProps) {
-  return <EpisodeClient params={params} />
+export default async function EpisodePage({ params }: { params: Params }) {
+  const [{ slug, episode }, lang] = await Promise.all([params, getLang()]);
+  const anime = await getAnimeBySlug(slug);
+  if (!anime) notFound();
+  const num = Number(episode);
+  const ep = anime.episodes.find((e) => e.numero === num);
+  if (!ep) notFound();
+
+  const episodes = anime.episodes.map((e) => ({
+    id: e.id,
+    numero: e.numero,
+    title_es: e.title_es,
+    title_en: e.title_en,
+    video_url: e.video_url,
+    youtube_url: e.youtube_url,
+  }));
+
+  return (
+    <EpisodeClient
+      key={ep.id}
+      lang={lang}
+      anime={{
+        id: anime.id,
+        slug: anime.slug,
+        title_es: anime.title_es,
+        title_en: anime.title_en,
+        sinopsis_es: anime.sinopsis_es,
+        sinopsis_en: anime.sinopsis_en,
+        genero: anime.genero,
+      }}
+      episode={{
+        id: ep.id,
+        numero: ep.numero,
+        title_es: ep.title_es,
+        title_en: ep.title_en,
+        video_url: ep.video_url,
+        youtube_url: ep.youtube_url,
+      }}
+      episodes={episodes}
+    />
+  );
 }

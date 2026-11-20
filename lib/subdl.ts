@@ -20,7 +20,7 @@ const IDIOMAS_ES = new Set([
   "es-la",
   "es-mx",
   "spanish",
-  "espa\u00f1ol",
+  "español",
   "espanol",
 ])
 

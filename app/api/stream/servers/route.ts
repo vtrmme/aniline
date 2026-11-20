@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase"
+import { createAdminSupabaseClient } from "@/lib/server/supabase"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/rate-limit"
 import {
@@ -107,7 +107,7 @@ async function buscarSubtituloSubdl(
   return null
 }
 
-function pistaAniZoneEspañol(subs: SubtituloAniZone[]): SubtitleTrack | null {
+function pistaAniZoneEspanol(subs: SubtituloAniZone[]): SubtitleTrack | null {
   const es = subs.find((s) => idiomaEsEspanol(s.idioma))
   if (!es) return null
   return {
@@ -156,12 +156,11 @@ async function resolverControlado(
   const [subdl, anizone] = await Promise.all([subdlPromise, anizonePromise])
 
   const subtitles: SubtitleTrack[] = []
-  const esNativa = pistaAniZoneEspañol(anizone.subs)
+  const esNativa = pistaAniZoneEspanol(anizone.subs)
   const auto = esNativa ? null : pistaAniZoneTraducida(anizone.subs)
   const subAniZone = esNativa || auto
 
   if (anizone.m3u8) {
-    // Priorizar subtitulos de la misma fuente que el video para mantener sincronizacion
     if (subAniZone) {
       subtitles.push(subAniZone)
     }
@@ -227,7 +226,7 @@ export async function GET(req: Request) {
     }
     const numero = Number(episodeParam)
 
-    const supabase = createServerClient()
+    const supabase = createAdminSupabaseClient()
 
     const { data: anime, error: animeError } = await supabase
       .from("animes")

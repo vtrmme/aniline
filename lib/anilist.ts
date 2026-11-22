@@ -27,6 +27,7 @@ export interface AnilistMedia {
   duration?: number
   chapters?: number
   volumes?: number
+  adult?: boolean
   genres?: string[]
   tags?: Array<{ name: string }>
   synonyms?: string[]
@@ -76,7 +77,8 @@ const MEDIA_FIELDS = `
           studios(isMain: true) { nodes { name } }
           coverImage { large medium color }
           bannerImage
-`
+          adult
+          `
 
 function dormir(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -167,7 +169,7 @@ ${MEDIA_FIELDS}
     throw new Error(`Error de AniList: ${errorMessages}`)
   }
 
-  return json.data?.Page?.media || []
+  return (json.data?.Page?.media || []).filter((m) => m.adult !== true)
 }
 
 function mapEstado(status?: string): string | undefined {

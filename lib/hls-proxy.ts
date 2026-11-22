@@ -1,4 +1,4 @@
-const HOSTS_PERMITIDOS = /(^|\.)vid-cdn\.xyz$/i
+const HOSTS_PERMITIDOS = /(^|\.)(vid-cdn|xin-cdn)\.xyz$/i
 
 export function srcValido(valor: string | null): URL | null {
   if (!valor) return null

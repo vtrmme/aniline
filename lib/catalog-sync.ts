@@ -210,7 +210,7 @@ async function procesarMedia(
   // Episodios: anadir solo los que falten (nunca borra video_url)
   const { data: epsData, error: epsError } = await supabase
     .from("episodes")
-    .select("numero")
+    .select("numero, video_url")
     .eq("anime_id", animeId)
 
   if (epsError) {
@@ -218,8 +218,11 @@ async function procesarMedia(
   }
 
   const existentes = new Set<number>(
-    (epsData || []).map((e: { numero: number }) => e.numero)
+    (epsData || []).map((e: { numero: number; video_url?: string }) => e.numero)
   )
+  const todosExistentesSinVideo = epsData && epsData.length > 0
+    ? epsData.every((e: { video_url?: string }) => !e.video_url || e.video_url.trim() === '')
+    : false
   const maximoExistente = existentes.size > 0 ? Math.max(...existentes) : 0
   const total = computeTotalEpisodes(media, maximoExistente)
 
@@ -228,6 +231,14 @@ async function procesarMedia(
     if (faltantes.length > 0) {
       resultado.episodiosCreados += await insertarEpisodios(supabase, faltantes)
     }
+
+    // Si todos los episodios existentes tienen video_url vacío, contar como error
+    if (todosExistentesSinVideo) {
+      resultado.errores++
+    }
+  } else {
+    // Anime sin episodios totales calculables
+    resultado.errores++
   }
 
   await supabase
